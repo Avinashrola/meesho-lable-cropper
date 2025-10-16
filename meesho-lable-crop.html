@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meesho Label Cropper</title>
+
+    <!-- FAVICON LINK: Added a simple box icon using inline SVG -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter Font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f9;
+        }
+        .container-card {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            background-color: white;
+        }
+    </style>
+    <!-- Load PDF Libraries -->
+    <!-- pdf-lib for PDF manipulation (copying/saving) -->
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <!-- pdf.js for text extraction (for sorting) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.js"></script>
+    <!-- pdf.js worker script URL setup (required by pdf.js) -->
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.js';
+    </script>
+</head>
+<body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
+
+    <div id="app" class="w-full max-w-4xl container-card p-6 sm:p-10 rounded-xl">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
+            <svg class="w-8 h-8 mr-3 text-indigo-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.414L16.586 7A2 2 0 0117 8.414V16a2 2 0 01-2 2H5a2 2 0 01-2-2V4zm5 10a1 1 0 000 2h2a1 1 0 100-2H9zm-2-5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd"></path></svg>
+            Meesho Label Cropper (By Product/SKU)
+        </h1>
+        <p class="text-gray-600 mb-8">Upload your multi-page Meesho label PDF. The tool will extract the **SKU (Product Details)** to sort and group similar items, filter blank pages, and export a new PDF (all done in your browser).</p>
+
+        <!-- Main Upload Area -->
+        <div id="upload-section" class="bg-indigo-50 border-2 border-indigo-200 border-dashed rounded-lg p-6 text-center transition duration-300 hover:border-indigo-400">
+            <input type="file" id="pdfFile" accept=".pdf" class="hidden" onchange="handleFileChange(event)">
+            <label for="pdfFile" class="cursor-pointer">
+                <div class="flex flex-col items-center justify-center p-4">
+                    <svg class="w-12 h-12 text-indigo-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v2m-5 4H9m0 0l-3-3m3 3l3-3"></path></svg>
+                    <p class="text-lg font-semibold text-indigo-600">Drag & drop or Click to upload PDF</p>
+                    <p class="text-sm text-gray-500 mt-1">Only .pdf files are accepted (max size 50MB)</p>
+                </div>
+            </label>
+        </div>
+
+        <!-- Processing & Results Area -->
+        <div id="status-area" class="mt-8 hidden">
+            <div id="loading-indicator" class="flex items-center justify-center p-4 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="status-message" class="font-medium">Loading PDF...</span>
+            </div>
+
+            <div id="result-area" class="hidden mt-6">
+                <div class="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-between">
+                    <span class="font-medium" id="success-message">Processing Complete!</span>
+                    <button id="download-button" onclick="downloadPdf()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
+                        Download Sorted PDF
+                    </button>
+                </div>
+                
+                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                    <h3 class="font-semibold text-gray-700 mb-2">Summary:</h3>
+                    <p class="text-sm text-gray-600" id="summary-output"></p>
+                </div>
+
+                <!-- NEW: SKU Count Breakdown -->
+                <div class="mt-8 pt-4 border-t border-gray-300">
+                    <h3 class="text-xl font-bold text-gray-700 mb-4">
+                        SKU Label Breakdown 📦
+                    </h3>
+                    <div id="sku-count-breakdown" class="space-y-3">
+                        <!-- SKU list and counts will be injected here -->
+                    </div>
+                </div>
+                <!-- End SKU Count Breakdown -->
+            </div>
+            
+            <div id="error-area" class="hidden mt-6 bg-red-100 text-red-800 p-4 rounded-lg shadow-inner">
+                <p class="font-medium">Error during processing:</p>
+                <p class="text-sm mt-1" id="error-message"></p>
+            </div>
+        </div>
+
+        <!-- Instructions/Disclaimer
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Important Note on Sorting:</h3>
+            <ul class="text-sm text-gray-500 space-y-2 list-disc list-inside">
+                <li>Sorting now groups labels by their core **SKU name** (e.g., 'red-bandhni'), ignoring any specific color or size numbers for maximum grouping.</li>
+                <li>The output PDF pages are **cropped to a 22 cm x 22 cm square** for standardized printing.</li>
+                <li>Blank pages are still automatically removed.</li>
+            </ul>
+        </div> -->
+
+    </div>
+
+    <script>
+        // Global constants for PDF Cropping (22 cm = 220 mm)
+        // PDF units are points (1 point = 1/72 inch. 1 inch = 25.4 mm.
+        const MM_TO_POINTS = 72 / 25.4;
+        const TARGET_WIDTH_MM = 220; // 22 cm
+        const TARGET_HEIGHT_MM = 210; // 21 cm
+
+        const TARGET_WIDTH_POINTS = TARGET_WIDTH_MM * MM_TO_POINTS;
+        const TARGET_HEIGHT_POINTS = TARGET_HEIGHT_MM * MM_TO_POINTS;
+
+
+        // Global variables for Firebase access (required by Canvas environment)
+        // NOTE: These are unused in this client-side app but kept for environment compatibility.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
+
+        let sortedPdfBytes = null;
+        let uniqueSkuCounts = {}; // Stores { 'SKU_PRD-DAMINI-PURPLE': { rawSku: '...', count: 5 }, ... }
+
+        // Utility to display status and errors
+        function updateStatus(message, isError = false) {
+            document.getElementById('upload-section').classList.add('hidden');
+            document.getElementById('status-area').classList.remove('hidden');
+            document.getElementById('loading-indicator').classList.remove('hidden');
+            document.getElementById('result-area').classList.add('hidden');
+            document.getElementById('error-area').classList.add('hidden');
+            
+            document.getElementById('status-message').textContent = message;
+
+            if (isError) {
+                document.getElementById('loading-indicator').classList.add('hidden');
+                document.getElementById('error-area').classList.remove('hidden');
+                document.getElementById('error-message').textContent = message;
+            }
+        }
+
+        function showResult(message, summary) {
+            document.getElementById('loading-indicator').classList.add('hidden');
+            document.getElementById('error-area').classList.add('hidden');
+            document.getElementById('result-area').classList.remove('hidden');
+            document.getElementById('success-message').textContent = message;
+            document.getElementById('summary-output').textContent = summary;
+        }
+
+        function resetUI() {
+            document.getElementById('upload-section').classList.remove('hidden');
+            document.getElementById('status-area').classList.add('hidden');
+            document.getElementById('pdfFile').value = '';
+            document.getElementById('sku-count-breakdown').innerHTML = ''; // Clear SKU list
+            sortedPdfBytes = null;
+            uniqueSkuCounts = {}; // Reset counts
+        }
+
+        /**
+         * Normalizes SKU by removing trailing numbers to group variations of the same core product.
+         * @param {string} sku The raw SKU string.
+         * @returns {string} The SKU string with numbers stripped.
+         */
+        function normalizeSkuForGrouping(sku) {
+            // 1. Remove any number followed by a space or end-of-string (e.g., ' 1').
+            let strippedSku = sku.replace(/\s+\d+$/g, '');
+
+            // 2. Remove any remaining isolated numbers or number sequences (e.g., 'SADI-Pink 14' -> 'SADI-Pink')
+            strippedSku = strippedSku.replace(/(\s\d+)/g, '');
+
+            return strippedSku;
+        }
+
+        /**
+         * Heuristic function to extract the product identifier (SKU from Product Details).
+         * @param {string} rawText The extracted text content of a page.
+         * @returns {string} The extracted SKU, HSN, or fallback.
+         */
+        function extractSku(rawText) {
+            let descriptiveSku = '';
+            
+            // --- Primary Search (SKU in Product Details block - Columnar structure) ---
+            // Pattern 1: Match the value row based on the header row structure provided by user. 
+            // Captures the SKU value preceded by the header row and preceding the next field (Size, Qty, etc.)
+            const skuPattern1 = /(?:SKU\s*Size\s*Qty\s*Color\s*Order No\.)\s*([\w\-\s]+?)\s*(?:Size|Qty|Color|Free Size)/i;
+            let skuMatch1 = rawText.match(skuPattern1);
+            
+            if (skuMatch1 && skuMatch1[1]) {
+                descriptiveSku = skuMatch1[1].trim();
+            }
+            
+            // --- Fallback Search (If pattern 1 fails, try direct text capture, handling new lines/spaces) ---
+            if (!descriptiveSku) {
+                // Pattern 2: Looks for "SKU" label, ignores large whitespace/newlines (\W*), 
+                // captures the following text ([\w\-\s]+?) until the next known field label.
+                const fallbackSkuPattern = /SKU\s*(\W*([\w\-\s]+?))\s*(?:Size|Qty|Color|Order No|TAX INVOICE)/i;
+                let fallbackMatch = rawText.match(fallbackSkuPattern);
+                 if (fallbackMatch && fallbackMatch[2]) {
+                     descriptiveSku = fallbackMatch[2].trim();
+                 }
+            }
+
+
+            // --- Final SKU Check, Normalization, and Grouping/Counting ---
+            if (descriptiveSku && descriptiveSku.length > 2) {
+                // 1. Remove variation numbers for grouping (e.g., 'red-bandhni 1' -> 'red-bandhni')
+                const groupedSku = normalizeSkuForGrouping(descriptiveSku);
+                
+                // 2. Clean & Uppercase for final sorting key (removes spaces, hyphens, etc. for cleaner sort)
+                const normalizedSku = groupedSku.toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
+
+                const sortingKey = 'SKU_PRD-' + normalizedSku;
+                
+                // Update the global count map
+                if (!uniqueSkuCounts[sortingKey]) {
+                    uniqueSkuCounts[sortingKey] = {
+                        rawSku: descriptiveSku,
+                        count: 1
+                    };
+                } else {
+                    uniqueSkuCounts[sortingKey].count++;
+                }
+
+                console.log(`[DEBUG] Found SKU_PRD: ${descriptiveSku} -> Grouped SKU: ${normalizedSku}`);
+                return sortingKey;
+            }
+
+
+            // 2. Fallback to HSN Code (less specific)
+            const hsnMatch = rawText.match(/(?:HSN|SKU)\s*([0-9]{6,10})|("HSN"\s*,"Qty"\s*,"Gross Amount"\s*,"Discount"\s*[^,]+,\s*"([0-9]{6,10}))/i);
+            if (hsnMatch && (hsnMatch[1] || hsnMatch[3])) {
+                const hsnCode = (hsnMatch[1] || hsnMatch[3]).trim();
+                const sortingKey = 'SKU_HSN-' + hsnCode;
+
+                // Update the global count map
+                if (!uniqueSkuCounts[sortingKey]) {
+                    uniqueSkuCounts[sortingKey] = {
+                        rawSku: `HSN: ${hsnCode}`,
+                        count: 1
+                    };
+                } else {
+                    uniqueSkuCounts[sortingKey].count++;
+                }
+
+                console.log(`[DEBUG] Found SKU_HSN: ${hsnCode}`);
+                 return sortingKey;
+            }
+
+            // 3. Fallback to the unique Purchase Order ID (absolute fallback)
+            const purchaseOrderMatch = rawText.match(/Purchase Order\s*(\d{10,20})/);
+            if (purchaseOrderMatch) {
+                const orderId = purchaseOrderMatch[1].trim();
+                console.log(`[DEBUG] Found ORDER ID: ${orderId}`);
+                 return 'ORDER-' + orderId;
+            }
+            
+            console.log(`[DEBUG] Failed to find SKU/HSN/Order ID. Falling back. Raw text length: ${rawText.length}`);
+            return 'UNKNOWN_SORT_FALLBACK';
+        }
+
+        /**
+         * Uses pdf.js to extract text content from a single PDF page.
+         * @param {object} pdfDocument The PDF document object from pdf.js.
+         * @param {number} pageNumber The 1-based index of the page.
+         * @returns {Promise<string>} The raw text content of the page.
+         */
+        async function getTextFromPdfPage(pdfDocument, pageNumber) {
+            const page = await pdfDocument.getPage(pageNumber);
+            const textContent = await page.getTextContent();
+            
+            // Combine items into a single string for easier regex searching
+            return textContent.items.map(item => item.str).join(' ');
+        }
+
+        /**
+         * Renders the final list of unique SKUs and their counts.
+         */
+        function renderSkuCounts() {
+            const skuListDiv = document.getElementById('sku-count-breakdown');
+            skuListDiv.innerHTML = '';
+            
+            const uniqueSkus = Object.keys(uniqueSkuCounts);
+            
+            if (uniqueSkus.length === 0) {
+                skuListDiv.innerHTML = '<p class="text-sm text-gray-500">No unique products with a detectable SKU were found for counting.</p>';
+                return;
+            }
+
+            // Convert object to array for sorting (alphabetical by SKU)
+            const sortedCounts = Object.entries(uniqueSkuCounts)
+                .map(([key, value]) => ({ key, ...value }))
+                .sort((a, b) => a.key.localeCompare(b.key));
+            
+            sortedCounts.forEach(data => {
+                // Display the raw SKU description and the final count
+                const cleanSkuName = data.rawSku.trim();
+                
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm';
+                item.innerHTML = `
+                    <p class="font-medium text-gray-800 break-all mr-4">
+                        ${cleanSkuName}
+                    </p>
+                    <span class="text-lg font-bold text-indigo-600">
+                        ${data.count}
+                    </span>
+                `;
+                skuListDiv.appendChild(item);
+            });
+        }
+
+
+        /**
+         * Main function to process the PDF file (Sorting and Cropping to 22x22cm).
+         * @param {ArrayBuffer} arrayBuffer The raw PDF data.
+         */
+        async function processPdf(arrayBuffer) {
+            try {
+                // Reset unique counts at the start of processing
+                uniqueSkuCounts = {};
+
+                updateStatus('Starting PDF processing...');
+                
+                const pdfjsDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const pdfLibDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                
+                const numPages = pdfLibDoc.getPages().length;
+
+                if (numPages === 0) {
+                    throw new Error("The PDF file contains no pages.");
+                }
+
+                const pageData = [];
+                let unknownSkuCount = 0;
+                let pagesRemoved = 0;
+
+                updateStatus(`Processing ${numPages} pages and extracting SKU/HSN for sorting...`);
+
+                // 1. Extract SKU/HSN and build map
+                for (let i = 0; i < numPages; i++) {
+                    const pageIndex = i;
+                    const pageNumber = i + 1;
+
+                    // Use pdf.js to extract text content
+                    const rawText = await getTextFromPdfPage(pdfjsDoc, pageNumber);
+                    
+                    // Check if the page is blank (very little text content)
+                    if (rawText.length < 30) {
+                        pagesRemoved++;
+                        console.log(`Page ${pageNumber} is likely blank (text length: ${rawText.length}). Skipping.`);
+                        continue; // Skip blank pages
+                    }
+
+                    // NOTE: extractSku populates uniqueSkuCounts global variable
+                    const sku = extractSku(rawText); 
+                    if (sku.startsWith('UNKNOWN')) {
+                        unknownSkuCount++;
+                    }
+
+                    // Add the page reference and sorting key
+                    pageData.push({
+                        pageIndex: pageIndex,
+                        sku: sku,
+                        rawTextLength: rawText.length,
+                    });
+                }
+                
+                const pagesKept = pageData.length;
+                if (pagesKept === 0) {
+                    throw new Error("No non-blank pages found in the uploaded PDF. Please check your source file.");
+                }
+
+                // 2. Sort the page data by SKU
+                updateStatus(`Sorting ${pagesKept} labels by core SKU name...`);
+
+                pageData.sort((a, b) => {
+                    // Primary sort by the extracted SKU (SKU_PRD-xxx, SKU_HSN-xxx, ORDER-xxx)
+                    return a.sku.localeCompare(b.sku);
+                });
+
+                // 3. Create a new PDF document and copy/crop pages in sorted order
+                updateStatus('Creating and cropping new sorted PDF pages to 22x22 cm...');
+                const newPdfDoc = await PDFLib.PDFDocument.create();
+                
+                // Map the original page indices in the new sorted order
+                const sortedPageIndices = pageData.map(d => d.pageIndex);
+                
+                // Copy the pages once, in the correct order
+                // NOTE: We don't use this array directly in the loop below as it can sometimes result in NaN pages.
+                // const copiedPages = await newPdfDoc.copyPages(pdfLibDoc, sortedPageIndices);
+                
+                // 4. Add pages to the new document with 22cm cropping
+                // We will iterate over the sorted indices and copy/draw the page one by one.
+                for (const pageInfo of pageData) {
+                    const originalPage = pdfLibDoc.getPages()[pageInfo.pageIndex];
+
+                    // Defensive check: Should not be needed if sorting logic is right, but prevents crash.
+                    if (!originalPage) {
+                        console.warn(`[WARN] Skipping page at original index ${pageInfo.pageIndex} as it could not be retrieved.`);
+                        continue;
+                    }
+                    
+                    // Copy the content of the ORIGINAL page into the NEW document.
+                    // This gives us a PDFEmbeddedPage object.
+                    const embeddedPage = await newPdfDoc.embedPage(originalPage);
+
+                    // FIX: Explicitly ensure dimensions are valid numbers to prevent NaN errors in drawPage
+                    const embeddedWidth = Number(embeddedPage.width);
+                    const embeddedHeight = Number(embeddedPage.height);
+                    
+                    if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
+                         console.warn(`[WARN] Invalid embedded page dimensions (${embeddedWidth}x${embeddedHeight}) for page ${pageInfo.pageIndex + 1}. Skipping cropping for this page.`);
+                         continue;
+                    }
+
+                    // Create a new, blank page in the new document with the exact target dimensions
+                    const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
+                    
+                    // Draw the embedded page content onto the new, smaller page.
+                    // This acts as a crop, as only the content that falls within the 22x22cm boundary is shown.
+                    
+                    // Calculate Y offset (must be number)
+                    const yOffset = croppedPage.getHeight() - embeddedHeight;
+                    
+                    // Draw the embedded page onto the new page at the calculated offset
+                    croppedPage.drawPage(embeddedPage, {
+                        x: 0, 
+                        // PDF coordinates start bottom-left. 
+                        // We align the top of the embedded page (embeddedHeight) 
+                        // with the top of the cropped page (croppedPage.getHeight()). 
+                        y: yOffset, 
+                        width: embeddedWidth,
+                        height: embeddedHeight,
+                    });
+                }
+                
+                // 5. Save and store the result
+                updateStatus('Finalizing document...');
+                sortedPdfBytes = await newPdfDoc.save();
+
+                const summary = `Original Pages: ${numPages} | Pages Kept (Non-blank): ${pagesKept} | Pages Removed (Blank): ${pagesRemoved} | Pages Sorted: ${pagesKept}`;
+                
+                showResult('Sorting and Cropping Complete!', summary);
+
+                // 6. Render SKU Counts
+                renderSkuCounts();
+
+                // Log the final sorted list for user verification
+                console.log("--- FINAL SORTED LABEL DATA (Page Number -> Sorting Key) ---");
+                pageData.forEach(d => console.log(`Page ${d.pageIndex + 1}: ${d.sku}`));
+                console.log("----------------------------------------------------------");
+
+            } catch (error) {
+                console.error('Processing error:', error);
+                updateStatus(`Failed to process PDF: ${error.message}`, true);
+            }
+        }
+
+        /**
+         * Handles the file input change event.
+         * @param {Event} event 
+         */
+        function handleFileChange(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                resetUI();
+                return;
+            }
+
+            // Simple validation
+            if (file.type !== 'application/pdf') {
+                updateStatus('Please upload a valid PDF file.', true);
+                return;
+            }
+            if (file.size > 50 * 1024 * 1024) { // 50 MB limit
+                updateStatus('File size exceeds 50MB limit.', true);
+                return;
+            }
+
+            updateStatus('Reading file data...');
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    await processPdf(e.target.result);
+                } catch (error) {
+                    // This catch block handles errors thrown inside processPdf
+                    // No need to call updateStatus again here as it's handled in processPdf's catch block
+                }
+            };
+            reader.onerror = function() {
+                updateStatus('Failed to read the file.', true);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        /**
+         * Initiates the download of the generated PDF.
+         */
+        function downloadPdf() {
+            if (!sortedPdfBytes) {
+                // Using a custom message box instead of alert()
+                const errorMessage = "No processed PDF data available for download.";
+                console.error(errorMessage);
+                // Simple UI feedback if a modal is not implemented
+                document.getElementById('error-message').textContent = errorMessage;
+                document.getElementById('error-area').classList.remove('hidden');
+                return;
+            }
+
+            const blob = new Blob([sortedPdfBytes], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `meesho_labels_sorted_and_cropped_${Date.now()}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize App (Optional: Add event listeners for drag/drop if desired)
+        window.onload = function() {
+            // Re-enables file upload if the user navigates back
+            resetUI();
+            
+            // Log for firebase requirements, though not strictly used for this client-side app
+            const dummyAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            console.log(`App ID: ${dummyAppId}`);
+        };
+
+    </script>
+</body>
+</html>
