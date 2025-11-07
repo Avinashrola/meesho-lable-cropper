@@ -1,26 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meesho Label Cropper </title>
 
     <!-- FAVICON LINK: Added a simple box icon using inline SVG -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
 
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter Font -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f7f7f9;
         }
+
         .container-card {
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
             background-color: white;
         }
+
         .group-badge {
             display: inline-block;
             padding: 0.25rem 0.75rem;
@@ -37,21 +42,35 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.js';
     </script>
 </head>
+
 <body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
 
     <div id="app" class="w-full max-w-4xl container-card p-6 sm:p-10 rounded-xl">
         <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
-            <svg class="w-8 h-8 mr-3 text-indigo-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.414L16.586 7A2 2 0 0117 8.414V16a2 2 0 01-2 2H5a2 2 0 01-2-2V4zm5 10a1 1 0 000 2h2a1 1 0 100-2H9zm-2-5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd"></path></svg>
+            <svg class="w-8 h-8 mr-3 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"
+                xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd"
+                    d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.414L16.586 7A2 2 0 0117 8.414V16a2 2 0 01-2 2H5a2 2 0 01-2-2V4zm5 10a1 1 0 000 2h2a1 1 0 100-2H9zm-2-5a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z"
+                    clip-rule="evenodd"></path>
+            </svg>
             Meesho Label Cropper (By Product/SKU)
         </h1>
-        <p class="text-gray-600 mb-8">Upload your multi-page Meesho label PDF. The tool will extract the **SKU (Product Details)** to sort and group similar items, filter blank pages, and export a new PDF (all done in your browser).</p>
+        <p class="text-gray-600 mb-8">Upload your multi-page Meesho label PDF. The tool will extract the **SKU (Product
+            Details)** to sort and group similar items, filter blank pages, and export a new PDF (all done in your
+            browser).</p>
 
         <!-- Main Upload Area -->
-        <div id="upload-section" class="bg-indigo-50 border-2 border-indigo-200 border-dashed rounded-lg p-6 text-center transition duration-300 hover:border-indigo-400">
+        <div id="upload-section"
+            class="bg-indigo-50 border-2 border-indigo-200 border-dashed rounded-lg p-6 text-center transition duration-300 hover:border-indigo-400">
             <input type="file" id="pdfFile" accept=".pdf" class="hidden" onchange="handleFileChange(event)">
             <label for="pdfFile" class="cursor-pointer">
                 <div class="flex flex-col items-center justify-center p-4">
-                    <svg class="w-12 h-12 text-indigo-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v2m-5 4H9m0 0l-3-3m3 3l3-3"></path></svg>
+                    <svg class="w-12 h-12 text-indigo-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4v2m-5 4H9m0 0l-3-3m3 3l3-3">
+                        </path>
+                    </svg>
                     <p class="text-lg font-semibold text-indigo-600">Drag & drop or Click to upload PDF</p>
                     <p class="text-sm text-gray-500 mt-1">Only .pdf files are accepted (max size 50MB)</p>
                 </div>
@@ -60,10 +79,14 @@
 
         <!-- Processing & Results Area -->
         <div id="status-area" class="mt-8 hidden">
-            <div id="loading-indicator" class="flex items-center justify-center p-4 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <div id="loading-indicator"
+                class="flex items-center justify-center p-4 bg-yellow-100 text-yellow-800 rounded-lg shadow-inner">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg"
+                    fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
                 </svg>
                 <span id="status-message" class="font-medium">Loading PDF...</span>
             </div>
@@ -71,17 +94,18 @@
             <div id="result-area" class="hidden mt-6">
                 <div class="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-between">
                     <span class="font-medium" id="success-message">Processing Complete!</span>
-                    <button id="download-button" onclick="downloadPdf()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
+                    <button id="download-button" onclick="downloadPdf()"
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
                         Download Sorted PDF
                     </button>
                 </div>
-                
+
                 <div class="mt-6 p-4 bg-gray-50 rounded-lg">
                     <h3 class="font-semibold text-gray-700 mb-2">Summary:</h3>
                     <p class="text-sm text-gray-600" id="summary-output"></p>
                 </div>
 
-                 <!-- NEW: Account Name Breakdown -->
+                <!-- NEW: Account Name Breakdown -->
                 <div class="mt-8 pt-4 border-t border-gray-300">
                     <h3 class="text-xl font-bold text-gray-700 mb-4">
                         Orders by Meesho Account 👤
@@ -101,9 +125,9 @@
                     </div>
                 </div>
 
-               
+
             </div>
-            
+
             <div id="error-area" class="hidden mt-6 bg-red-100 text-red-800 p-4 rounded-lg shadow-inner">
                 <p class="font-medium">Error during processing:</p>
                 <p class="text-sm mt-1" id="error-message"></p>
@@ -115,19 +139,25 @@
             <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                        <svg class="w-6 h-6 mr-2 text-purple-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
+                        <svg class="w-6 h-6 mr-2 text-purple-600" fill="currentColor" viewBox="0 0 20 20"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                        </svg>
                         Custom SKU Grouping
                     </h2>
-                    <button onclick="proceedWithoutGrouping()" class="text-sm text-gray-600 hover:text-gray-800 underline">
+                    <button onclick="proceedWithoutGrouping()"
+                        class="text-sm text-gray-600 hover:text-gray-800 underline">
                         Skip & Use Auto-Sort
                     </button>
                 </div>
-                <p class="text-gray-600 mb-6">Create custom groups and assign SKUs to organize your labels exactly how you want.</p>
+                <p class="text-gray-600 mb-6">Create custom groups and assign SKUs to organize your labels exactly how
+                    you want.</p>
 
                 <!-- Detected SKUs List -->
                 <div class="mb-6">
                     <h3 class="text-lg font-semibold text-gray-700 mb-3">Detected SKUs (Click to add to group)</h3>
-                    <div id="detected-skus-list" class="bg-white p-4 rounded-lg border border-gray-200 max-h-64 overflow-y-auto">
+                    <div id="detected-skus-list"
+                        class="bg-white p-4 rounded-lg border border-gray-200 max-h-64 overflow-y-auto">
                         <!-- SKUs will be populated here -->
                     </div>
                 </div>
@@ -136,7 +166,8 @@
                 <div class="mb-6">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-lg font-semibold text-gray-700">Your Groups</h3>
-                        <button onclick="addNewGroup()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200">
+                        <button onclick="addNewGroup()"
+                            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-200">
                             + Add Group
                         </button>
                     </div>
@@ -147,10 +178,12 @@
 
                 <!-- Action Buttons -->
                 <div class="flex gap-3 mt-6">
-                    <button onclick="applyCustomGrouping()" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-200">
+                    <button onclick="applyCustomGrouping()"
+                        class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-200">
                         Apply Custom Grouping & Download
                     </button>
-                    <button onclick="resetGrouping()" class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-6 rounded-lg transition duration-200">
+                    <button onclick="resetGrouping()"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-6 rounded-lg transition duration-200">
                         Reset
                     </button>
                 </div>
@@ -163,10 +196,12 @@
                 <p class="text-sm text-gray-500">
                     Developed by
                 </p>
-                <a href="https://dashinfotech.com/" target="_blank" rel="noopener noreferrer" 
-                   class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg shadow-md hover:from-indigo-700 hover:to-purple-700 transition duration-300 transform hover:scale-105">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
+                <a href="https://dashinfotech.com/" target="_blank" rel="noopener noreferrer"
+                    class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg shadow-md hover:from-indigo-700 hover:to-purple-700 transition duration-300 transform hover:scale-105">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
                     </svg>
                     Dash Infotech
                 </a>
@@ -228,16 +263,16 @@
             try {
                 const savedGroups = localStorage.getItem(STORAGE_KEYS.GROUPS);
                 const savedCounter = localStorage.getItem(STORAGE_KEYS.GROUP_COUNTER);
-                
+
                 if (savedGroups) {
                     customGroups = JSON.parse(savedGroups);
                     console.log(`Loaded ${customGroups.length} groups from storage`);
                 }
-                
+
                 if (savedCounter) {
                     groupCounter = parseInt(savedCounter, 10);
                 }
-                
+
                 return customGroups.length > 0;
             } catch (error) {
                 console.error('Failed to load groups:', error);
@@ -262,7 +297,7 @@
             document.getElementById('result-area').classList.add('hidden');
             document.getElementById('error-area').classList.add('hidden');
             document.getElementById('grouping-section').classList.add('hidden');
-            
+
             document.getElementById('status-message').textContent = message;
 
             if (isError) {
@@ -312,7 +347,7 @@
 
             let match = rawText.match(returnToPattern);
             console.log(match);
-            
+
             if (match && match[1]) {
                 const accountName = match[1].trim();
                 // Validate: reasonable length and not just numbers
@@ -324,7 +359,7 @@
             // Fallback Pattern 1: Look for "Sold by:" or "Seller:" followed by the name
             const soldByPattern = /(?:Sold by|Seller)\s*:?\s*([A-Za-z0-9\s\.\-&]+?)(?:\s*(?:Email|Phone|Address|HSN|TAX|GSTIN|Contact|Mobile))/i;
             match = rawText.match(soldByPattern);
-            
+
             if (match && match[1]) {
                 const accountName = match[1].trim();
                 if (accountName.length > 2 && accountName.length < 60 && !/^\d+$/.test(accountName)) {
@@ -335,7 +370,7 @@
             // Fallback Pattern 2: Look for account name near "Supplier" or "Vendor"
             const supplierPattern = /(?:Supplier|Vendor)\s*:?\s*([A-Za-z0-9\s\.\-&]+?)(?:\s*(?:Email|Phone|Address|HSN|TAX|GSTIN))/i;
             match = rawText.match(supplierPattern);
-            
+
             if (match && match[1]) {
                 const accountName = match[1].trim();
                 if (accountName.length > 2 && accountName.length < 60 && !/^\d+$/.test(accountName)) {
@@ -346,7 +381,7 @@
             // Fallback Pattern 3: Extract from "From" section
             const fromPattern = /(?:From)\s*:?\s*([A-Za-z0-9\s\.\-&]+?)(?:\s*(?:\d|,|Email|Phone|Address|Contact))/i;
             match = rawText.match(fromPattern);
-            
+
             if (match && match[1]) {
                 const accountName = match[1].trim();
                 if (accountName.length > 2 && accountName.length < 60 && !/^\d+$/.test(accountName)) {
@@ -359,14 +394,14 @@
 
         function extractSku(rawText) {
             let descriptiveSku = '';
-            
+
             const skuPattern1 = /(?:SKU\s*Size\s*Qty\s*Color\s*Order No\.)\s*([\w\-\s]+?)\s*(?:Size|Qty|Color|Free Size)/i;
             let skuMatch1 = rawText.match(skuPattern1);
-            
+
             if (skuMatch1 && skuMatch1[1]) {
                 descriptiveSku = skuMatch1[1].trim();
             }
-            
+
             if (!descriptiveSku) {
                 const fallbackSkuPattern = /SKU\s*(\W*([\w\-\s]+?))\s*(?:Size|Qty|Color|Order No|TAX INVOICE)/i;
                 let fallbackMatch = rawText.match(fallbackSkuPattern);
@@ -379,7 +414,7 @@
                 const groupedSku = normalizeSkuForGrouping(descriptiveSku);
                 const normalizedSku = groupedSku.toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
                 const sortingKey = 'SKU_PRD-' + normalizedSku;
-                
+
                 if (!uniqueSkuCounts[sortingKey]) {
                     uniqueSkuCounts[sortingKey] = {
                         rawSku: descriptiveSku,
@@ -414,7 +449,7 @@
                 const orderId = purchaseOrderMatch[1].trim();
                 return 'ORDER-' + orderId;
             }
-            
+
             return 'UNKNOWN_SORT_FALLBACK';
         }
 
@@ -427,9 +462,9 @@
         function renderSkuCounts() {
             const skuListDiv = document.getElementById('sku-count-breakdown');
             skuListDiv.innerHTML = '';
-            
+
             const uniqueSkus = Object.keys(uniqueSkuCounts);
-            
+
             if (uniqueSkus.length === 0) {
                 skuListDiv.innerHTML = '<p class="text-sm text-gray-500">No unique products with a detectable SKU were found for counting.</p>';
                 return;
@@ -438,10 +473,10 @@
             const sortedCounts = Object.entries(uniqueSkuCounts)
                 .map(([key, value]) => ({ key, ...value }))
                 .sort((a, b) => a.key.localeCompare(b.key));
-            
+
             sortedCounts.forEach(data => {
                 const cleanSkuName = data.rawSku.trim();
-                
+
                 const item = document.createElement('div');
                 item.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm';
                 item.innerHTML = `
@@ -459,9 +494,9 @@
         function renderAccountCounts() {
             const accountListDiv = document.getElementById('account-count-breakdown');
             accountListDiv.innerHTML = '';
-            
+
             const accounts = Object.keys(accountNameCounts);
-            
+
             if (accounts.length === 0) {
                 accountListDiv.innerHTML = '<p class="text-sm text-gray-500">No account information detected.</p>';
                 return;
@@ -473,9 +508,9 @@
                     if (b[1] !== a[1]) return b[1] - a[1]; // Sort by count descending
                     return a[0].localeCompare(b[0]); // Then alphabetically
                 });
-            
+
             const totalOrders = sortedAccounts.reduce((sum, [, count]) => sum + count, 0);
-            
+
             // Add total summary card
             const summaryCard = document.createElement('div');
             summaryCard.className = 'p-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg shadow-md mb-4';
@@ -496,7 +531,7 @@
             // Add individual account cards
             sortedAccounts.forEach(([accountName, count]) => {
                 const percentage = ((count / totalOrders) * 100).toFixed(1);
-                
+
                 const item = document.createElement('div');
                 item.className = 'bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden';
                 item.innerHTML = `
@@ -524,17 +559,17 @@
                 detectedSkuData = {};
 
                 updateStatus('Starting PDF processing...');
-                
+
                 const pdfjsDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const pdfLibDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-                
+
                 // Store for later use
                 pdfDocumentData = {
                     arrayBuffer: arrayBuffer,
                     pdfjsDoc: pdfjsDoc,
                     pdfLibDoc: pdfLibDoc
                 };
-                
+
                 const numPages = pdfLibDoc.getPages().length;
 
                 if (numPages === 0) {
@@ -551,7 +586,7 @@
                     const pageNumber = i + 1;
 
                     const rawText = await getTextFromPdfPage(pdfjsDoc, pageNumber);
-                    
+
                     if (rawText.length < 30) {
                         pagesRemoved++;
                         continue;
@@ -582,7 +617,7 @@
                     }
                     detectedSkuData[sku].pageIndices.push(pageIndex);
                 }
-                
+
                 const pagesKept = pageData.length;
                 if (pagesKept === 0) {
                     throw new Error("No non-blank pages found in the uploaded PDF. Please check your source file.");
@@ -591,13 +626,13 @@
                 if (showGroupingUI) {
                     // Load saved groups before showing UI
                     const hasStoredGroups = loadGroupsFromStorage();
-                    
+
                     // Show grouping UI
                     document.getElementById('loading-indicator').classList.add('hidden');
                     document.getElementById('grouping-section').classList.remove('hidden');
                     renderDetectedSkus();
                     renderGroups();
-                    
+
                     // Show notification if groups were loaded
                     if (hasStoredGroups) {
                         showNotification(`Loaded ${customGroups.length} saved group(s)`, 'success');
@@ -622,42 +657,42 @@
                 });
 
                 const newPdfDoc = await PDFLib.PDFDocument.create();
-                
+
                 for (const pageInfo of pageData) {
                     const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
 
                     if (!originalPage) {
                         continue;
                     }
-                    
+
                     const embeddedPage = await newPdfDoc.embedPage(originalPage);
                     const embeddedWidth = Number(embeddedPage.width);
                     const embeddedHeight = Number(embeddedPage.height);
-                    
+
                     if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
                         continue;
                     }
 
                     const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
                     const yOffset = croppedPage.getHeight() - embeddedHeight;
-                    
+
                     croppedPage.drawPage(embeddedPage, {
-                        x: 0, 
-                        y: yOffset, 
+                        x: 0,
+                        y: yOffset,
                         width: embeddedWidth,
                         height: embeddedHeight,
                     });
                 }
-                
+
                 updateStatus('Finalizing document...');
                 sortedPdfBytes = await newPdfDoc.save();
 
                 const summary = `Original Pages: ${originalNumPages} | Pages Kept: ${pageData.length} | Pages Removed: ${pagesRemoved}`;
-                
+
                 showResult('Sorting and Cropping Complete!', summary);
                 renderAccountCounts(); // Render account breakdown
                 renderSkuCounts();
-                
+
 
             } catch (error) {
                 console.error('Finalization error:', error);
@@ -670,7 +705,7 @@
             container.innerHTML = '';
 
             const skus = Object.keys(detectedSkuData);
-            
+
             if (skus.length === 0) {
                 container.innerHTML = '<p class="text-sm text-gray-500">No SKUs detected</p>';
                 return;
@@ -679,7 +714,7 @@
             skus.forEach(skuKey => {
                 const data = detectedSkuData[skuKey];
                 const count = data.pageIndices.length;
-                
+
                 const skuItem = document.createElement('div');
                 skuItem.className = 'flex items-center justify-between p-3 mb-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 cursor-pointer transition duration-200';
                 skuItem.onclick = () => showSkuAssignmentModal(skuKey);
@@ -700,14 +735,14 @@
         function addNewGroup() {
             const colorIndex = (customGroups.length) % groupColors.length;
             const colors = groupColors[colorIndex];
-            
+
             const newGroup = {
                 id: `group-${groupCounter++}`,
                 name: `Group ${customGroups.length + 1}`,
                 skus: [],
                 color: colors
             };
-            
+
             customGroups.push(newGroup);
             saveGroupsToStorage(); // Save after adding
             renderGroups();
@@ -725,7 +760,7 @@
             customGroups.forEach((group, index) => {
                 const groupDiv = document.createElement('div');
                 groupDiv.className = `${group.color.bg} ${group.color.border} border-2 rounded-lg p-4`;
-                
+
                 const skuList = group.skus.map(skuKey => {
                     const data = detectedSkuData[skuKey];
                     if (!data) return ''; // SKU not in current PDF
@@ -814,17 +849,17 @@
         function toggleSkuInGroup(groupIndex, skuKey) {
             const group = customGroups[groupIndex];
             const skuIndex = group.skus.indexOf(skuKey);
-            
+
             if (skuIndex > -1) {
                 group.skus.splice(skuIndex, 1);
             } else {
                 group.skus.push(skuKey);
             }
-            
+
             saveGroupsToStorage(); // Save after toggling
             renderGroups();
             updateSkuBadges(skuKey);
-            
+
             // Refresh the modal
             closeModal();
             setTimeout(() => showSkuAssignmentModal(skuKey), 100);
@@ -835,7 +870,7 @@
             if (!badgeContainer) return;
 
             badgeContainer.innerHTML = '';
-            
+
             customGroups.forEach(group => {
                 if (group.skus.includes(skuKey)) {
                     const badge = document.createElement('span');
@@ -883,13 +918,21 @@
                 document.getElementById('grouping-section').classList.add('hidden');
 
                 const pageData = [];
-                
+
                 // First, add grouped SKUs in order
                 customGroups.forEach((group, groupIndex) => {
                     const groupPrefix = String(groupIndex + 1).padStart(3, '0');
-                    
+
+
+
+
                     group.skus.forEach(skuKey => {
                         const data = detectedSkuData[skuKey];
+
+                        if (!data) {
+                            console.warn(`SKU key ${skuKey} found in group ${group.name}, but not detected in current PDF. Skipping.`);
+                            return; // Skip this SKU
+                        }
                         data.pageIndices.forEach(pageIndex => {
                             pageData.push({
                                 pageIndex: pageIndex,
@@ -905,6 +948,10 @@
                 Object.keys(detectedSkuData).forEach(skuKey => {
                     if (!allGroupedSkus.has(skuKey)) {
                         const data = detectedSkuData[skuKey];
+                        if (!data) {
+                            console.warn(`Ungrouped SKU key ${skuKey} missing data. Skipping.`);
+                            return;
+                        }
                         data.pageIndices.forEach(pageIndex => {
                             pageData.push({
                                 pageIndex: pageIndex,
@@ -915,49 +962,56 @@
                     }
                 });
 
+                if (pageData.length === 0) {
+                    throw new Error("No SKUs were successfully mapped for grouping. Check your groups and uploaded file.");
+                }
+
                 // Sort by the prefixed SKU
                 pageData.sort((a, b) => a.sku.localeCompare(b.sku));
 
                 // Create the PDF
                 const newPdfDoc = await PDFLib.PDFDocument.create();
-                
+
+
+
                 for (const pageInfo of pageData) {
                     const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
 
                     if (!originalPage) {
                         continue;
                     }
-                    
+
+
                     const embeddedPage = await newPdfDoc.embedPage(originalPage);
                     const embeddedWidth = Number(embeddedPage.width);
                     const embeddedHeight = Number(embeddedPage.height);
-                    
+
                     if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
                         continue;
                     }
 
                     const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
                     const yOffset = croppedPage.getHeight() - embeddedHeight;
-                    
+
                     croppedPage.drawPage(embeddedPage, {
-                        x: 0, 
-                        y: yOffset, 
+                        x: 0,
+                        y: yOffset,
                         width: embeddedWidth,
                         height: embeddedHeight,
                     });
                 }
-                
+
                 updateStatus('Finalizing document...');
                 sortedPdfBytes = await newPdfDoc.save();
 
                 const groupedCount = customGroups.reduce((sum, g) => sum + g.skus.length, 0);
                 const ungroupedCount = Object.keys(detectedSkuData).length - groupedCount;
                 const summary = `Custom Groups: ${customGroups.length} | Grouped SKUs: ${groupedCount} | Ungrouped SKUs: ${ungroupedCount} | Total Pages: ${pageData.length}`;
-                
+
                 showResult('Custom Grouping Applied Successfully!', summary);
                 renderAccountCounts(); // Render account breakdown for custom grouping too
                 renderCustomGroupSummary();
-              
+
 
             } catch (error) {
                 console.error('Grouping error:', error);
@@ -971,18 +1025,25 @@
 
             customGroups.forEach(group => {
                 const totalLabels = group.skus.reduce((sum, skuKey) => {
-                    return sum + detectedSkuData[skuKey].pageIndices.length;
+                    const data = detectedSkuData[skuKey];
+                    // Only count if the SKU data exists in the current PDF
+                    if (data) {
+                        return sum + data.pageIndices.length;
+                    }
+                    return sum;
                 }, 0);
 
                 const groupDiv = document.createElement('div');
                 groupDiv.className = `mb-4 ${group.color.bg} ${group.color.border} border-2 rounded-lg p-4`;
-                
+
                 const skuDetails = group.skus.map(skuKey => {
+                   
                     const data = detectedSkuData[skuKey];
+                     if(data){
                     return `<div class="flex justify-between items-center bg-white px-3 py-2 rounded mb-2">
                         <span class="text-sm text-gray-700">${data.rawSku}</span>
                         <span class="font-semibold ${group.color.text}">${data.pageIndices.length}</span>
-                    </div>`;
+                    </div>`;}
                 }).join('');
 
                 groupDiv.innerHTML = `
@@ -992,18 +1053,18 @@
                     </div>
                     ${skuDetails}
                 `;
-                
+
                 skuListDiv.appendChild(groupDiv);
             });
 
             // Show ungrouped SKUs
             const allGroupedSkus = new Set(customGroups.flatMap(g => g.skus));
             const ungroupedSkus = Object.keys(detectedSkuData).filter(sku => !allGroupedSkus.has(sku));
-            
+
             if (ungroupedSkus.length > 0) {
                 const ungroupedDiv = document.createElement('div');
                 ungroupedDiv.className = 'mb-4 bg-gray-100 border-2 border-gray-300 rounded-lg p-4';
-                
+
                 const ungroupedDetails = ungroupedSkus.map(skuKey => {
                     const data = detectedSkuData[skuKey];
                     return `<div class="flex justify-between items-center bg-white px-3 py-2 rounded mb-2">
@@ -1023,7 +1084,7 @@
                     </div>
                     ${ungroupedDetails}
                 `;
-                
+
                 skuListDiv.appendChild(ungroupedDiv);
             }
         }
@@ -1055,16 +1116,16 @@
             }
 
             updateStatus('Reading file data...');
-            
+
             const reader = new FileReader();
-            reader.onload = async function(e) {
+            reader.onload = async function (e) {
                 try {
                     await processPdf(e.target.result, true);
                 } catch (error) {
                     console.error('File processing error:', error);
                 }
             };
-            reader.onerror = function() {
+            reader.onerror = function () {
                 updateStatus('Failed to read the file.', true);
             };
             reader.readAsArrayBuffer(file);
@@ -1099,19 +1160,19 @@
                 info: 'bg-blue-500',
                 warning: 'bg-yellow-500'
             };
-            
+
             notification.className = `fixed top-4 right-4 ${bgColors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
             notification.textContent = message;
-            
+
             document.body.appendChild(notification);
-            
+
             setTimeout(() => {
                 notification.style.opacity = '0';
                 setTimeout(() => notification.remove(), 300);
             }, 3000);
         }
 
-        window.onload = function() {
+        window.onload = function () {
             resetUI();
             // Load groups on initial page load
             loadGroupsFromStorage();
@@ -1119,4 +1180,5 @@
 
     </script>
 </body>
+
 </html>
