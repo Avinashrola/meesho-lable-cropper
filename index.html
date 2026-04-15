@@ -394,13 +394,13 @@
 
         function extractShippingProvider(rawText) {
             const providers = ['Valmo', 'Shadowfax', 'Delhivery', 'Xpress Bees'];
-            
+
             for (const provider of providers) {
                 if (rawText.toLowerCase().includes(provider.toLowerCase())) {
                     return provider;
                 }
             }
-            
+
             return 'Unknown Provider';
         }
 
@@ -427,7 +427,7 @@
                 /Gross Amount\s+Rs\.\s*\d+\.\d+\s+(\d+)/i,  // After Gross Amount, quantity
                 /(\d+)\s+Rs\.\d+\.\d+/i  // quantity followed by Rs. amount
             ];
-            
+
             for (const pattern of qtyPatterns) {
                 const match = rawText.match(pattern);
                 if (match && match[1]) {
@@ -438,7 +438,7 @@
                     }
                 }
             }
-            
+
             console.log('No quantity found, defaulting to 1. Full text:', rawText);
             return 1; // Default to 1 if not found
         }
@@ -446,7 +446,7 @@
         function extractSku(rawText) {
             let descriptiveSku = '';
 
-            const skuPattern1 = /(?:SKU\s*Size\s*Qty\s*Color\s*Order No\.)\s*([\w\-\s]+?)\s*(?:Size|Qty|Color|Free Size)/i;
+            const skuPattern1 = /(?:SKU\s*Size\s*Qty\s*Color\s*Order No\.)\s*([^\r\n]+?)\s*(?:Size|Qty|Color|Free Size)/i;
             let skuMatch1 = rawText.match(skuPattern1);
 
             if (skuMatch1 && skuMatch1[1]) {
@@ -454,10 +454,10 @@
             }
 
             if (!descriptiveSku) {
-                const fallbackSkuPattern = /SKU\s*(\W*([\w\-\s]+?))\s*(?:Size|Qty|Color|Order No|TAX INVOICE)/i;
+                const fallbackSkuPattern = /SKU\s*[:#]?\s*([^\r\n]+?)\s*(?:Size|Qty|Color|Order No|TAX INVOICE)/i;
                 let fallbackMatch = rawText.match(fallbackSkuPattern);
-                if (fallbackMatch && fallbackMatch[2]) {
-                    descriptiveSku = fallbackMatch[2].trim();
+                if (fallbackMatch && fallbackMatch[1]) {
+                    descriptiveSku = fallbackMatch[1].trim();
                 }
             }
 
@@ -788,6 +788,17 @@
             }
         }
 
+        function getSkuBadgeContainerId(skuKey) {
+            return `sku-badges-${skuKey.replace(/[^a-zA-Z0-9]/g, '')}`;
+        }
+
+        function getSkuGroupBadgesHtml(skuKey) {
+            return customGroups
+                .filter(group => group.skus.includes(skuKey))
+                .map(group => `<span class="group-badge ${group.color.bg} ${group.color.text}">${group.name}</span>`)
+                .join('');
+        }
+
         function renderDetectedSkus() {
             const container = document.getElementById('detected-skus-list');
             container.innerHTML = '';
@@ -802,6 +813,7 @@
             skus.forEach(skuKey => {
                 const data = detectedSkuData[skuKey];
                 const count = data.pages.length;
+                const badgeHtml = getSkuGroupBadgesHtml(skuKey);
 
                 const skuItem = document.createElement('div');
                 skuItem.className = 'flex items-center justify-between p-3 mb-2 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 cursor-pointer transition duration-200';
@@ -811,8 +823,8 @@
                         <p class="font-medium text-gray-800">${data.rawSku}</p>
                         <p class="text-xs text-gray-500">${count} label(s)</p>
                     </div>
-                    <div id="sku-badges-${skuKey.replace(/[^a-zA-Z0-9]/g, '')}" class="flex flex-wrap gap-1">
-                        <!-- Group badges will appear here -->
+                    <div id="${getSkuBadgeContainerId(skuKey)}" class="flex flex-wrap gap-1">
+                        ${badgeHtml}
                     </div>
                     <svg class="w-5 h-5 text-gray-400 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 `;
@@ -875,6 +887,7 @@
         function updateGroupName(index, newName) {
             customGroups[index].name = newName;
             saveGroupsToStorage(); // Save after updating
+            renderDetectedSkus();
         }
 
         function deleteGroup(index) {
@@ -886,6 +899,14 @@
             }
         }
 
+        function escapeForSingleQuote(str) {
+            return String(str)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/\n/g, '\\n')
+                .replace(/\r/g, '\\r');
+        }
+
         function showSkuAssignmentModal(skuKey) {
             if (customGroups.length === 0) {
                 alert('Please create at least one group first!');
@@ -893,10 +914,11 @@
             }
 
             const data = detectedSkuData[skuKey];
+            const safeSkuKey = escapeForSingleQuote(skuKey);
             const groupOptions = customGroups.map((group, index) => {
                 const isAssigned = group.skus.includes(skuKey);
                 const checkmark = isAssigned ? '✓ ' : '';
-                return `<div onclick="toggleSkuInGroup(${index}, '${skuKey}')" 
+                return `<div onclick="toggleSkuInGroup(${index}, '${safeSkuKey}')" 
                              class="p-3 mb-2 ${group.color.bg} ${group.color.border} border-2 rounded-lg cursor-pointer hover:opacity-80 transition duration-200">
                     <p class="font-semibold ${group.color.text}">${checkmark}${group.name}</p>
                 </div>`;
@@ -935,26 +957,33 @@
         }
 
         function toggleSkuInGroup(groupIndex, skuKey) {
-            const group = customGroups[groupIndex];
-            const skuIndex = group.skus.indexOf(skuKey);
+            const selectedGroup = customGroups[groupIndex];
+            const alreadyAssigned = selectedGroup.skus.includes(skuKey);
 
-            if (skuIndex > -1) {
-                group.skus.splice(skuIndex, 1);
-            } else {
-                group.skus.push(skuKey);
+            // Remove sku from all groups first
+            customGroups.forEach(group => {
+                const skuIndex = group.skus.indexOf(skuKey);
+                if (skuIndex > -1) {
+                    group.skus.splice(skuIndex, 1);
+                }
+            });
+
+            // If it wasn't already assigned to this group, assign it here
+            if (!alreadyAssigned) {
+                selectedGroup.skus.push(skuKey);
             }
 
-            saveGroupsToStorage(); // Save after toggling
+            saveGroupsToStorage();
             renderGroups();
-            updateSkuBadges(skuKey);
+            renderDetectedSkus();
 
-            // Refresh the modal
+            // Refresh the modal to show the new assignment state
             closeModal();
             setTimeout(() => showSkuAssignmentModal(skuKey), 100);
         }
 
         function updateSkuBadges(skuKey) {
-            const badgeContainer = document.getElementById(`sku-badges-${skuKey.replace(/[^a-zA-Z0-9]/g, '')}`);
+            const badgeContainer = document.getElementById(getSkuBadgeContainerId(skuKey));
             if (!badgeContainer) return;
 
             badgeContainer.innerHTML = '';
@@ -1068,26 +1097,26 @@
                     if (aQtyGroup !== bQtyGroup) {
                         return aQtyGroup - bQtyGroup;
                     }
-                    
+
                     // Extract group prefix (first part before -)
                     const aParts = a.sku.split('-');
                     const bParts = b.sku.split('-');
                     const aGroup = aParts[0];
                     const bGroup = bParts[0];
-                    
+
                     // Then sort by group within the same quantity group
                     const groupCompare = aGroup.localeCompare(bGroup);
                     if (groupCompare !== 0) {
                         return groupCompare;
                     }
-                    
+
                     // Then sort by shipping provider within the same group and quantity group
                     const aProviderOrder = getProviderSortOrder(a.shippingProvider);
                     const bProviderOrder = getProviderSortOrder(b.shippingProvider);
                     if (aProviderOrder !== bProviderOrder) {
                         return aProviderOrder - bProviderOrder;
                     }
-                    
+
                     // Finally sort by SKU within the same group, provider, and quantity group
                     const aSku = aParts.slice(1).join('-');
                     const bSku = bParts.slice(1).join('-');
@@ -1162,13 +1191,14 @@
                 groupDiv.className = `mb-4 ${group.color.bg} ${group.color.border} border-2 rounded-lg p-4`;
 
                 const skuDetails = group.skus.map(skuKey => {
-                   
+
                     const data = detectedSkuData[skuKey];
-                     if(data){
-                    return `<div class="flex justify-between items-center bg-white px-3 py-2 rounded mb-2">
+                    if (data) {
+                        return `<div class="flex justify-between items-center bg-white px-3 py-2 rounded mb-2">
                         <span class="text-sm text-gray-700">${data.rawSku}</span>
                         <span class="font-semibold ${group.color.text}">${data.pages.length}</span>
-                    </div>`;}
+                    </div>`;
+                    }
                 }).join('');
 
                 groupDiv.innerHTML = `
