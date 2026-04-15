@@ -977,9 +977,8 @@
             renderGroups();
             renderDetectedSkus();
 
-            // Refresh the modal to show the new assignment state
+            // Close the modal immediately after assigning the SKU
             closeModal();
-            setTimeout(() => showSkuAssignmentModal(skuKey), 100);
         }
 
         function updateSkuBadges(skuKey) {
