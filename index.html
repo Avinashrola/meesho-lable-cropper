@@ -108,6 +108,14 @@
                             Smart Grouping
                         </button>
                     </div>
+                    <div class="mt-4 flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="multi-qty-toggle" type="checkbox" checked onchange="moveMultiQtyToEnd = this.checked"
+                                class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                            <span class="text-sm text-slate-900">Move  Multi-quantity orders to the end</span>
+                        </label>
+                        <span class="text-sm text-gray-500">Enabled by default</span>
+                    </div>
                     <p class="text-sm text-gray-500 mt-3">Pick a method to sort your labels before exporting.</p>
                 </div>
             </div>
@@ -263,6 +271,7 @@
         let processedPageData = [];
         let processedPagesRemoved = 0;
         let originalPageCount = 0;
+        let moveMultiQtyToEnd = true;
 
         // Storage keys
         const STORAGE_KEYS = {
@@ -357,6 +366,10 @@
             document.getElementById('result-area').classList.add('hidden');
             document.getElementById('error-area').classList.add('hidden');
             document.getElementById('grouping-section').classList.add('hidden');
+            const toggle = document.getElementById('multi-qty-toggle');
+            if (toggle) {
+                toggle.checked = moveMultiQtyToEnd;
+            }
             document.getElementById('sort-options-area').classList.remove('hidden');
         }
 
@@ -403,6 +416,7 @@
             processedPageData = [];
             processedPagesRemoved = 0;
             originalPageCount = 0;
+            moveMultiQtyToEnd = true;
         }
 
         function normalizeSkuForGrouping(sku) {
@@ -872,6 +886,13 @@
                 const sortedPageData = [...pageData];
                 if (sortMode === 'provider') {
                     sortedPageData.sort((a, b) => {
+                        if (moveMultiQtyToEnd) {
+                            const aQtyGroup = getQuantitySortOrder(a.quantity);
+                            const bQtyGroup = getQuantitySortOrder(b.quantity);
+                            if (aQtyGroup !== bQtyGroup) {
+                                return aQtyGroup - bQtyGroup;
+                            }
+                        }
                         const providerCompare = getProviderSortOrder(a.shippingProvider) - getProviderSortOrder(b.shippingProvider);
                         if (providerCompare !== 0) {
                             return providerCompare;
@@ -884,6 +905,13 @@
                     });
                 } else {
                     sortedPageData.sort((a, b) => {
+                        if (moveMultiQtyToEnd) {
+                            const aQtyGroup = getQuantitySortOrder(a.quantity);
+                            const bQtyGroup = getQuantitySortOrder(b.quantity);
+                            if (aQtyGroup !== bQtyGroup) {
+                                return aQtyGroup - bQtyGroup;
+                            }
+                        }
                         const skuCompare = a.sku.localeCompare(b.sku);
                         if (skuCompare !== 0) {
                             return skuCompare;
