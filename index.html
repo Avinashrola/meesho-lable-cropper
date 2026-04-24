@@ -116,6 +116,14 @@
                         </label>
                         <span class="text-sm text-gray-500">Enabled by default</span>
                     </div>
+                    <div class="mt-3 flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="crop-tax-toggle" type="checkbox" checked onchange="cropTaxInvoice = this.checked"
+                                class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                            <span class="text-sm text-slate-900">Crop TAX INVOICE section</span>
+                        </label>
+                        <span class="text-sm text-gray-500">Enabled by default</span>
+                    </div>
                     <p class="text-sm text-gray-500 mt-3">Pick a method to sort your labels before exporting.</p>
                 </div>
             </div>
@@ -194,6 +202,13 @@
                 <!-- Detected SKUs List -->
                 <div class="mb-6">
                     <h3 class="text-lg font-semibold text-gray-700 mb-3">Detected SKUs (Click to add to group)</h3>
+                    <!-- Search Input -->
+                    <div class="mb-3">
+                        <input type="text" id="sku-search-input" 
+                            oninput="filterSkus(this.value)"
+                            placeholder="Search SKUs..."
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                    </div>
                     <div id="detected-skus-list"
                         class="bg-white p-4 rounded-lg border border-gray-200 max-h-64 overflow-y-auto">
                         <!-- SKUs will be populated here -->
@@ -272,6 +287,8 @@
         let processedPagesRemoved = 0;
         let originalPageCount = 0;
         let moveMultiQtyToEnd = true;
+        let cropTaxInvoice = true;
+        let currentSkuSearchText = ''; // Stores the current search text for persistence
 
         // Storage keys
         const STORAGE_KEYS = {
@@ -366,9 +383,13 @@
             document.getElementById('result-area').classList.add('hidden');
             document.getElementById('error-area').classList.add('hidden');
             document.getElementById('grouping-section').classList.add('hidden');
-            const toggle = document.getElementById('multi-qty-toggle');
-            if (toggle) {
-                toggle.checked = moveMultiQtyToEnd;
+            const qtyToggle = document.getElementById('multi-qty-toggle');
+            if (qtyToggle) {
+                qtyToggle.checked = moveMultiQtyToEnd;
+            }
+            const taxToggle = document.getElementById('crop-tax-toggle');
+            if (taxToggle) {
+                taxToggle.checked = cropTaxInvoice;
             }
             document.getElementById('sort-options-area').classList.remove('hidden');
         }
@@ -383,7 +404,14 @@
             document.getElementById('result-area').classList.add('hidden');
             document.getElementById('error-area').classList.add('hidden');
             document.getElementById('grouping-section').classList.remove('hidden');
-            renderDetectedSkus();
+            
+            // Restore search input value for persistence
+            const searchInput = document.getElementById('sku-search-input');
+            if (searchInput) {
+                searchInput.value = currentSkuSearchText;
+            }
+            
+            renderDetectedSkus(currentSkuSearchText);
             renderGroups();
         }
 
@@ -417,6 +445,7 @@
             processedPagesRemoved = 0;
             originalPageCount = 0;
             moveMultiQtyToEnd = true;
+            cropTaxInvoice = true;
         }
 
         function normalizeSkuForGrouping(sku) {
@@ -495,7 +524,10 @@
 
         function extractQuantity(rawText) {
             // Look for Qty patterns - more comprehensive
+            console.log('Raw text for quantity extraction:', rawText);
             const qtyPatterns = [
+                /Qty\s+(\d+)\s+Color/i,  // "Qty   2   Color" format (with spaces)
+                /Qty\s+(\d+)\s+NA/i,     // "Qty   2   NA" format (with spaces)
                 /Qty\s*:\s*(\d+)/i,
                 /Qty\s*(\d+)/i,
                 /Quantity\s*:\s*(\d+)/i,
@@ -508,7 +540,6 @@
                 /Qty(\d+)/i,     // Qty followed immediately by number
                 /(\d+)\s*pcs/i,  // e.g., "2 pcs"
                 /(\d+)\s*pieces/i, // e.g., "3 pieces"
-                /Quantity\s*(\d+)/i,
                 /Qty\s*(\d+)\s*Color/i,
                 /Color\s*\w+\s*Qty\s*(\d+)/i,
                 /Order\s*No\.\s*\w+\s*Qty\s*(\d+)/i,
@@ -529,6 +560,10 @@
             }
 
             console.log('No quantity found, defaulting to 1. Full text:', rawText);
+            // If text contains "Qty" but no number matched, assume quantity 2 for multi-qty orders
+            if (rawText.match(/Qty/i)) {
+                return 2;
+            }
             return 1; // Default to 1 if not found
         }
 
@@ -597,6 +632,48 @@
             const page = await pdfDocument.getPage(pageNumber);
             const textContent = await page.getTextContent();
             return textContent.items.map(item => item.str).join(' ');
+        }
+
+        async function getTextCoordinatesFromPage(pdfDocument, pageNumber) {
+            const page = await pdfDocument.getPage(pageNumber);
+            const textContent = await page.getTextContent();
+            return textContent.items;
+        }
+
+        function findTaxInvoiceCropY(textItems, pageHeight) {
+            if (!cropTaxInvoice) return null;
+            
+            let cropY = null;
+            for (let item of textItems) {
+                if (item.str && item.str.toUpperCase().includes('TAX')) {
+                    // Found TAX text, return the y0 position (bottom of text)
+                    // PDF coords: y0 is from bottom, we need to convert to top-down
+                    cropY = item.y0;
+                    break;
+                }
+            }
+            return cropY;
+        }
+
+        async function getTextCoordinatesFromPage(pdfDocument, pageNumber) {
+            const page = await pdfDocument.getPage(pageNumber);
+            const textContent = await page.getTextContent();
+            return textContent.items;
+        }
+
+        function findTaxInvoiceCropY(textItems, pageHeight) {
+            if (!cropTaxInvoice) return null;
+            
+            let cropY = null;
+            for (let item of textItems) {
+                if (item.str && item.str.toUpperCase().includes('TAX')) {
+                    // Found TAX text, return the y0 position (bottom of text)
+                    // PDF coords: y0 is from bottom, we need to convert to top-down
+                    cropY = item.y0;
+                    break;
+                }
+            }
+            return cropY;
         }
 
         function renderSkuCounts() {
@@ -796,6 +873,15 @@
                     const shippingProvider = extractShippingProvider(rawText);
                     const quantity = extractQuantity(rawText);
 
+                    // Get text coordinates to find TAX INVOICE position
+                    let cropY = null;
+                    if (cropTaxInvoice) {
+                        const textItems = await getTextCoordinatesFromPage(pdfjsDoc, pageNumber);
+                        const pageObj = await pdfjsDoc.getPage(pageNumber);
+                        const pageHeight = pageObj.view[3];
+                        cropY = findTaxInvoiceCropY(textItems, pageHeight);
+                    }
+
                     // Count orders by account name
                     if (!accountNameCounts[accountName]) {
                         accountNameCounts[accountName] = 0;
@@ -815,6 +901,7 @@
                         shippingProvider: shippingProvider,
                         quantity: quantity,
                         rawTextLength: rawText.length,
+                        cropY: cropY
                     });
 
                     // Store in detectedSkuData for grouping UI
@@ -827,7 +914,8 @@
                     detectedSkuData[sku].pages.push({
                         pageIndex: pageIndex,
                         shippingProvider: shippingProvider,
-                        quantity: quantity
+                        quantity: quantity,
+                        cropY: cropY
                     });
                 }
 
@@ -934,11 +1022,16 @@
                     }
 
                     const embeddedPage = await newPdfDoc.embedPage(originalPage);
-                    const embeddedWidth = Number(embeddedPage.width);
-                    const embeddedHeight = Number(embeddedPage.height);
+                    let embeddedWidth = Number(embeddedPage.width);
+                    let embeddedHeight = Number(embeddedPage.height);
 
                     if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
                         continue;
+                    }
+
+                    // Crop TAX INVOICE section if enabled and crop position found
+                    if (cropTaxInvoice && pageInfo.cropY !== null && pageInfo.cropY !== undefined) {
+                        embeddedHeight = pageInfo.cropY;
                     }
 
                     const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
@@ -981,14 +1074,27 @@
                 .join('');
         }
 
-        function renderDetectedSkus() {
+        function renderDetectedSkus(filterText = '') {
             const container = document.getElementById('detected-skus-list');
             container.innerHTML = '';
 
-            const skus = Object.keys(detectedSkuData);
+            let skus = Object.keys(detectedSkuData);
+
+            // Apply filter if search text is provided
+            if (filterText.trim() !== '') {
+                const searchLower = filterText.toLowerCase();
+                skus = skus.filter(skuKey => {
+                    const rawSku = detectedSkuData[skuKey].rawSku.toLowerCase();
+                    return rawSku.includes(searchLower);
+                });
+            }
 
             if (skus.length === 0) {
-                container.innerHTML = '<p class="text-sm text-gray-500">No SKUs detected</p>';
+                if (filterText.trim() !== '') {
+                    container.innerHTML = '<p class="text-sm text-gray-500">No SKUs match your search</p>';
+                } else {
+                    container.innerHTML = '<p class="text-sm text-gray-500">No SKUs detected</p>';
+                }
                 return;
             }
 
@@ -1012,6 +1118,11 @@
                 `;
                 container.appendChild(skuItem);
             });
+        }
+
+        function filterSkus(searchText) {
+            currentSkuSearchText = searchText;
+            renderDetectedSkus(searchText);
         }
 
         function addNewGroup() {
@@ -1069,7 +1180,7 @@
         function updateGroupName(index, newName) {
             customGroups[index].name = newName;
             saveGroupsToStorage(); // Save after updating
-            renderDetectedSkus();
+            renderDetectedSkus(currentSkuSearchText);
         }
 
         function deleteGroup(index) {
@@ -1077,7 +1188,7 @@
                 customGroups.splice(index, 1);
                 saveGroupsToStorage(); // Save after deleting
                 renderGroups();
-                renderDetectedSkus();
+                renderDetectedSkus(currentSkuSearchText);
             }
         }
 
@@ -1157,7 +1268,7 @@
 
             saveGroupsToStorage();
             renderGroups();
-            renderDetectedSkus();
+            renderDetectedSkus(currentSkuSearchText);
 
             // Close the modal immediately after assigning the SKU
             closeModal();
@@ -1291,9 +1402,6 @@
                 customGroups.forEach((group, groupIndex) => {
                     const groupPrefix = String(groupIndex + 1).padStart(3, '0');
 
-
-
-
                     group.skus.forEach(skuKey => {
                         const data = detectedSkuData[skuKey];
 
@@ -1301,57 +1409,121 @@
                             console.warn(`SKU key ${skuKey} found in group ${group.name}, but not detected in current PDF. Skipping.`);
                             return; // Skip this SKU
                         }
-                        data.pages.forEach(page => {
+                        // Sort pages within SKU
+                        const sortedPages = [...data.pages].sort((a, b) => {
+                            if (moveMultiQtyToEnd) {
+                                const aQty = getQuantitySortOrder(a.quantity);
+                                const bQty = getQuantitySortOrder(b.quantity);
+                                if (aQty !== bQty) return aQty - bQty;
+                            }
+                            const aProv = getProviderSortOrder(a.shippingProvider);
+                            const bProv = getProviderSortOrder(b.shippingProvider);
+                            if (aProv !== bProv) return aProv - bProv;
+                            return a.pageIndex - b.pageIndex; // Fallback to page order
+                        });
+                        sortedPages.forEach(page => {
                             pageData.push({
                                 pageIndex: page.pageIndex,
                                 sku: `${groupPrefix}-${skuKey}`,
                                 shippingProvider: page.shippingProvider,
                                 quantity: page.quantity,
-                                rawTextLength: 0
+                                rawTextLength: 0,
+                                cropY: page.cropY
                             });
                         });
                     });
                 });
 
-                // Then add ungrouped SKUs at the end
+                // Then add ungrouped SKUs at the end, sorted SKU-wise
                 const allGroupedSkus = new Set(customGroups.flatMap(g => g.skus));
-                Object.keys(detectedSkuData).forEach(skuKey => {
-                    if (!allGroupedSkus.has(skuKey)) {
-                        const data = detectedSkuData[skuKey];
-                        if (!data) {
-                            console.warn(`Ungrouped SKU key ${skuKey} missing data. Skipping.`);
-                            return;
-                        }
-                        data.pages.forEach(page => {
-                            pageData.push({
-                                pageIndex: page.pageIndex,
-                                sku: `999-${skuKey}`,
-                                shippingProvider: page.shippingProvider,
-                                quantity: page.quantity,
-                                rawTextLength: 0
-                            });
-                        });
+                const ungroupedSkus = Object.keys(detectedSkuData)
+                    .filter(skuKey => !allGroupedSkus.has(skuKey))
+                    .sort((a, b) => {
+                        const rawA = detectedSkuData[a].rawSku || a;
+                        const rawB = detectedSkuData[b].rawSku || b;
+                        return rawA.localeCompare(rawB);
+                    });
+                ungroupedSkus.forEach(skuKey => {
+                    const data = detectedSkuData[skuKey];
+                    if (!data) {
+                        console.warn(`Ungrouped SKU key ${skuKey} missing data. Skipping.`);
+                        return;
                     }
+                    // Sort pages within SKU
+                    const sortedPages = [...data.pages].sort((a, b) => {
+                        if (moveMultiQtyToEnd) {
+                            const aQty = getQuantitySortOrder(a.quantity);
+                            const bQty = getQuantitySortOrder(b.quantity);
+                            if (aQty !== bQty) return aQty - bQty;
+                        }
+                        const aProv = getProviderSortOrder(a.shippingProvider);
+                        const bProv = getProviderSortOrder(b.shippingProvider);
+                        if (aProv !== bProv) return aProv - bProv;
+                        return a.pageIndex - b.pageIndex; // Fallback to page order
+                    });
+                    sortedPages.forEach(page => {
+                        pageData.push({
+                            pageIndex: page.pageIndex,
+                            sku: `999-${skuKey}`,
+                            shippingProvider: page.shippingProvider,
+                            quantity: page.quantity,
+                            rawTextLength: 0,
+                            cropY: page.cropY
+                        });
+                    });
                 });
 
                 if (pageData.length === 0) {
                     throw new Error("No SKUs were successfully mapped for grouping. Check your groups and uploaded file.");
                 }
 
-                // Sort by quantity group, then by group, then by provider, then by SKU
+                // Sort by quantity group if enabled, then by group, then by provider, then by SKU
+                // For ungrouped SKUs (999 prefix): sort by SKU first, then provider, then quantity
                 pageData.sort((a, b) => {
-                    // First sort by quantity group: qty < 2 first, then qty >= 2
-                    const aQtyGroup = getQuantitySortOrder(a.quantity);
-                    const bQtyGroup = getQuantitySortOrder(b.quantity);
-                    if (aQtyGroup !== bQtyGroup) {
-                        return aQtyGroup - bQtyGroup;
-                    }
-
                     // Extract group prefix (first part before -)
                     const aParts = a.sku.split('-');
                     const bParts = b.sku.split('-');
                     const aGroup = aParts[0];
                     const bGroup = bParts[0];
+                    const aSku = aParts.slice(1).join('-');
+                    const bSku = bParts.slice(1).join('-');
+
+                    // Check if both are ungrouped SKUs (999 prefix)
+                    const aIsUngrouped = aGroup === '999';
+                    const bIsUngrouped = bGroup === '999';
+
+                    if (aIsUngrouped && bIsUngrouped) {
+                        // For ungrouped SKUs: sort by SKU first
+                        const skuCompare = aSku.localeCompare(bSku);
+                        if (skuCompare !== 0) {
+                            return skuCompare;
+                        }
+                        // Then by shipping provider within same SKU
+                        const aProviderOrder = getProviderSortOrder(a.shippingProvider);
+                        const bProviderOrder = getProviderSortOrder(b.shippingProvider);
+                        if (aProviderOrder !== bProviderOrder) {
+                            return aProviderOrder - bProviderOrder;
+                        }
+                        // Then by quantity group if enabled
+                        if (moveMultiQtyToEnd) {
+                            const aQtyGroup = getQuantitySortOrder(a.quantity);
+                            const bQtyGroup = getQuantitySortOrder(b.quantity);
+                            if (aQtyGroup !== bQtyGroup) {
+                                return aQtyGroup - bQtyGroup;
+                            }
+                        }
+                        return a.pageIndex - b.pageIndex;
+                    }
+
+                    // For grouped SKUs: use original sorting logic
+                    if (moveMultiQtyToEnd) {
+                        // First sort by quantity group: qty < 2 first, then qty >= 2
+                        const aQtyGroup = getQuantitySortOrder(a.quantity);
+                        const bQtyGroup = getQuantitySortOrder(b.quantity);
+                        if (aQtyGroup !== bQtyGroup) {
+                            return aQtyGroup - bQtyGroup;
+                        }
+                    }
 
                     // Then sort by group within the same quantity group
                     const groupCompare = aGroup.localeCompare(bGroup);
@@ -1367,15 +1539,11 @@
                     }
 
                     // Finally sort by SKU within the same group, provider, and quantity group
-                    const aSku = aParts.slice(1).join('-');
-                    const bSku = bParts.slice(1).join('-');
                     return aSku.localeCompare(bSku);
                 });
 
                 // Create the PDF
                 const newPdfDoc = await PDFLib.PDFDocument.create();
-
-
 
                 for (const pageInfo of pageData) {
                     const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
@@ -1384,13 +1552,17 @@
                         continue;
                     }
 
-
                     const embeddedPage = await newPdfDoc.embedPage(originalPage);
-                    const embeddedWidth = Number(embeddedPage.width);
-                    const embeddedHeight = Number(embeddedPage.height);
+                    let embeddedWidth = Number(embeddedPage.width);
+                    let embeddedHeight = Number(embeddedPage.height);
 
                     if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
                         continue;
+                    }
+
+                    // Crop TAX INVOICE section if enabled and crop position found
+                    if (cropTaxInvoice && pageInfo.cropY !== null && pageInfo.cropY !== undefined) {
+                        embeddedHeight = pageInfo.cropY;
                     }
 
                     const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
@@ -1498,9 +1670,17 @@
             if (confirm('Reset all groups? This will delete all saved groups permanently and cannot be undone.')) {
                 customGroups = [];
                 groupCounter = 1;
+                currentSkuSearchText = ''; // Clear search text
                 clearStoredGroups(); // Clear from storage
+                
+                // Clear search input
+                const searchInput = document.getElementById('sku-search-input');
+                if (searchInput) {
+                    searchInput.value = '';
+                }
+                
                 renderGroups();
-                renderDetectedSkus();
+                renderDetectedSkus('');
             }
         }
 
