@@ -38,6 +38,7 @@
     <!-- Load PDF Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.js';
     </script>
@@ -171,6 +172,15 @@
                     </div>
                 </div>
 
+                <div class="mt-8 pt-6 border-t border-gray-300">
+                    <div class="flex justify-end">
+                        <button id="share-summary-button" onclick="shareSummaryImage()"
+                            class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
+                            Share Summary Image
+                        </button>
+                    </div>
+                    <div id="share-summary-card" class="hidden"></div>
+                </div>
 
             </div>
 
@@ -1053,9 +1063,8 @@
                 showResult(`${modeLabel} Sorting and Cropping Complete!`, summary);
                 renderAccountCounts(); // Render account breakdown
                 renderProviderCounts(); // Render provider breakdown
-                renderProviderCounts(); // Render provider breakdown
                 renderSkuCounts();
-
+                renderShareSummaryCard();
 
             } catch (error) {
                 console.error('Finalization error:', error);
@@ -1587,6 +1596,7 @@
                 renderAccountCounts(); // Render account breakdown for custom grouping too
                 renderProviderCounts();
                 renderCustomGroupSummary();
+                renderShareSummaryCard();
 
 
             } catch (error) {
@@ -1595,25 +1605,129 @@
             }
         }
 
+        function renderShareSummaryCard() {
+            const shareCard = document.getElementById('share-summary-card');
+            if (!shareCard) return;
+
+            const providerEntries = Object.entries(providerNameCounts || {})
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+            const providerHtml = providerEntries.length
+                ? providerEntries.map(([providerName, count]) => {
+                    return `<div class="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg mb-2">
+                        <span class="font-medium text-slate-700">${providerName}</span>
+                        <span class="font-bold text-emerald-700">${count}</span>
+                    </div>`;
+                }).join('')
+                : '<p class="text-sm text-slate-500">No shipping provider data detected.</p>';
+
+            const groupHtml = customGroups.length
+                ? customGroups.map(group => {
+                    const totalOrders = group.skus.reduce((sum, skuKey) => {
+                        const data = detectedSkuData[skuKey];
+                        return sum + (data ? data.pages.length : 0);
+                    }, 0);
+                    return `<div class="rounded-xl border border-slate-200 bg-white p-3 mb-3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-slate-800">${group.name}</span>
+                            <span class="font-bold ${group.color.text}">${totalOrders} orders</span>
+                        </div>
+                        <div class="space-y-1">${group.skus.map(skuKey => {
+                            const data = detectedSkuData[skuKey];
+                            if (!data) return '';
+                            return `<div class="flex justify-between text-sm text-slate-700"><span>${data.rawSku}</span><span>${data.pages.length}</span></div>`;
+                        }).join('')}</div>
+                    </div>`;
+                }).join('')
+                : '<p class="text-sm text-slate-500">No custom groups were applied yet.</p>';
+
+            const totalOrders = providerEntries.reduce((sum, [, count]) => sum + count, 0);
+            const groupCount = customGroups.length;
+            const currentDate = new Date().toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+
+            shareCard.className = 'p-6 bg-white rounded-2xl border border-slate-200 shadow-lg max-w-2xl mx-auto';
+            shareCard.innerHTML = `
+                <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-xl mb-4">
+                    <div class="text-xs uppercase tracking-[0.24em] opacity-80">Meesho Summary</div>
+                    <div class="text-2xl font-bold mt-1">Custom Groups Summary</div>
+                    <div class="text-sm opacity-90 mt-1">Shipping Provider Breakdown</div>
+                    <div class="text-xs opacity-80 mt-2">Generated on: ${currentDate}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-slate-50 rounded-xl p-3">
+                        <div class="text-xs text-slate-500">Total Orders</div>
+                        <div class="text-2xl font-bold text-slate-800">${totalOrders}</div>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-3">
+                        <div class="text-xs text-slate-500">Custom Groups</div>
+                        <div class="text-2xl font-bold text-slate-800">${groupCount}</div>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <div class="text-lg font-bold text-slate-800 mb-2">Custom Groups Summary</div>
+                    ${groupHtml}
+                </div>
+                <div>
+                    <div class="text-lg font-bold text-slate-800 mb-2">Shipping Provider Breakdown</div>
+                    ${providerHtml}
+                </div>
+            `;
+        }
+
+        function appendCollapsibleGroupSummaryCard(container, { title, totalOrders, detailsHtml, cardClass, titleClass, countClass }) {
+            const wrapper = document.createElement('div');
+            wrapper.className = cardClass;
+            const detailsId = `group-summary-${Math.random().toString(36).slice(2, 11)}`;
+
+            wrapper.innerHTML = `
+                <button type="button"
+                    class="group-summary-toggle w-full flex justify-between items-center p-4 text-left cursor-pointer hover:opacity-90 transition-opacity"
+                    aria-expanded="false"
+                    aria-controls="${detailsId}">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <svg class="group-summary-chevron w-5 h-5 flex-shrink-0 transition-transform duration-200 ${titleClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        <h4 class="text-lg font-bold ${titleClass} truncate">${title}</h4>
+                    </div>
+                    <span class="text-xl font-bold ${countClass} flex-shrink-0 ml-2">${totalOrders} orders</span>
+                </button>
+                <div id="${detailsId}" class="group-summary-details hidden px-4 pb-4 pt-1 border-t border-black/10">
+                    ${detailsHtml}
+                </div>
+            `;
+
+            const toggle = wrapper.querySelector('.group-summary-toggle');
+            const details = wrapper.querySelector('.group-summary-details');
+            const chevron = wrapper.querySelector('.group-summary-chevron');
+
+            toggle.addEventListener('click', () => {
+                const willExpand = details.classList.contains('hidden');
+                details.classList.toggle('hidden');
+                toggle.setAttribute('aria-expanded', String(willExpand));
+                chevron.classList.toggle('rotate-90', willExpand);
+            });
+
+            container.appendChild(wrapper);
+        }
+
         function renderCustomGroupSummary() {
             const skuListDiv = document.getElementById('sku-count-breakdown');
             skuListDiv.innerHTML = '<h3 class="text-lg font-semibold text-gray-700 mb-3">Custom Groups Summary</h3>';
 
             customGroups.forEach(group => {
-                const totalLabels = group.skus.reduce((sum, skuKey) => {
+                const totalOrders = group.skus.reduce((sum, skuKey) => {
                     const data = detectedSkuData[skuKey];
-                    // Only count if the SKU data exists in the current PDF
                     if (data) {
                         return sum + data.pages.length;
                     }
                     return sum;
                 }, 0);
 
-                const groupDiv = document.createElement('div');
-                groupDiv.className = `mb-4 ${group.color.bg} ${group.color.border} border-2 rounded-lg p-4`;
-
                 const skuDetails = group.skus.map(skuKey => {
-
                     const data = detectedSkuData[skuKey];
                     if (data) {
                         return `<div class="flex justify-between items-center bg-white px-3 py-2 rounded mb-2">
@@ -1621,27 +1735,23 @@
                         <span class="font-semibold ${group.color.text}">${data.pages.length}</span>
                     </div>`;
                     }
+                    return '';
                 }).join('');
 
-                groupDiv.innerHTML = `
-                    <div class="flex justify-between items-center mb-3">
-                        <h4 class="text-lg font-bold ${group.color.text}">${group.name}</h4>
-                        <span class="text-xl font-bold ${group.color.text}">${totalLabels} labels</span>
-                    </div>
-                    ${skuDetails}
-                `;
-
-                skuListDiv.appendChild(groupDiv);
+                appendCollapsibleGroupSummaryCard(skuListDiv, {
+                    title: group.name,
+                    totalOrders,
+                    detailsHtml: skuDetails || '<p class="text-sm text-gray-500 py-2">No SKUs in this group.</p>',
+                    cardClass: `mb-4 ${group.color.bg} ${group.color.border} border-2 rounded-lg overflow-hidden`,
+                    titleClass: group.color.text,
+                    countClass: group.color.text,
+                });
             });
 
-            // Show ungrouped SKUs
             const allGroupedSkus = new Set(customGroups.flatMap(g => g.skus));
             const ungroupedSkus = Object.keys(detectedSkuData).filter(sku => !allGroupedSkus.has(sku));
 
             if (ungroupedSkus.length > 0) {
-                const ungroupedDiv = document.createElement('div');
-                ungroupedDiv.className = 'mb-4 bg-gray-100 border-2 border-gray-300 rounded-lg p-4';
-
                 const ungroupedDetails = ungroupedSkus.map(skuKey => {
                     const data = detectedSkuData[skuKey];
                     return `<div class="flex justify-between items-center bg-white px-3 py-2 rounded mb-2">
@@ -1654,15 +1764,67 @@
                     return sum + detectedSkuData[skuKey].pages.length;
                 }, 0);
 
-                ungroupedDiv.innerHTML = `
-                    <div class="flex justify-between items-center mb-3">
-                        <h4 class="text-lg font-bold text-gray-700">Ungrouped SKUs</h4>
-                        <span class="text-xl font-bold text-gray-600">${totalUngrouped} labels</span>
-                    </div>
-                    ${ungroupedDetails}
-                `;
+                appendCollapsibleGroupSummaryCard(skuListDiv, {
+                    title: 'Ungrouped SKUs',
+                    totalOrders: totalUngrouped,
+                    detailsHtml: ungroupedDetails,
+                    cardClass: 'mb-4 bg-gray-100 border-2 border-gray-300 rounded-lg overflow-hidden',
+                    titleClass: 'text-gray-700',
+                    countClass: 'text-gray-600',
+                });
+            }
+        }
 
-                skuListDiv.appendChild(ungroupedDiv);
+        async function createSummaryImageBlob() {
+            const shareCard = document.getElementById('share-summary-card');
+            if (!shareCard) {
+                throw new Error('Summary card is not ready yet.');
+            }
+
+            renderShareSummaryCard();
+            const canvas = await html2canvas(shareCard, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                useCORS: true,
+                logging: false
+            });
+
+            return new Promise((resolve, reject) => {
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error('Unable to create image blob.'));
+                        return;
+                    }
+                    resolve(blob);
+                }, 'image/png');
+            });
+        }
+
+        async function shareSummaryImage() {
+            try {
+                const blob = await createSummaryImageBlob();
+                const file = new File([blob], 'custom-groups-summary.png', { type: 'image/png' });
+
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        title: 'Custom Groups Summary',
+                        text: 'Here is the custom groups and shipping provider summary.',
+                        files: [file]
+                    });
+                    showNotification('Summary image shared successfully.', 'success');
+                    return;
+                }
+
+                const imageUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = imageUrl;
+                link.download = 'custom-groups-summary.png';
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(imageUrl), 2000);
+                showNotification('Image downloaded. You can now share it in WhatsApp manually.', 'success');
+            } catch (error) {
+                console.error('Share image failed:', error);
+                showNotification('Unable to create the image right now. Please try again.', 'error');
             }
         }
 
