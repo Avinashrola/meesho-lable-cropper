@@ -1488,10 +1488,19 @@
                     throw new Error("No SKUs were successfully mapped for grouping. Check your groups and uploaded file.");
                 }
 
-                // Sort by quantity group if enabled, then by group, then by provider, then by SKU
-                // For ungrouped SKUs (999 prefix): sort by SKU first, then provider, then quantity
-                pageData.sort((a, b) => {
-                    // Extract group prefix (first part before -)
+              // Sort by quantity group if enabled, then by group, then by provider, then by SKU
+              pageData.sort((a, b) => {
+                    // 1. GLOBAL MULTI-QTY CHECK: This MUST be the very first check.
+                    // It ensures that regardless of groups or SKUs, multi-qty orders are pushed to the end.
+                    if (moveMultiQtyToEnd) {
+                        const aQtyGroup = getQuantitySortOrder(a.quantity);
+                        const bQtyGroup = getQuantitySortOrder(b.quantity);
+                        if (aQtyGroup !== bQtyGroup) {
+                            return aQtyGroup - bQtyGroup;
+                        }
+                    }
+
+                    // 2. Extract group prefix (first part before -)
                     const aParts = a.sku.split('-');
                     const bParts = b.sku.split('-');
                     const aGroup = aParts[0];
@@ -1499,7 +1508,7 @@
                     const aSku = aParts.slice(1).join('-');
                     const bSku = bParts.slice(1).join('-');
 
-                    // Check if both are ungrouped SKUs (999 prefix)
+                    // 3. Check if both are ungrouped SKUs (999 prefix)
                     const aIsUngrouped = aGroup === '999';
                     const bIsUngrouped = bGroup === '999';
 
@@ -1515,44 +1524,25 @@
                         if (aProviderOrder !== bProviderOrder) {
                             return aProviderOrder - bProviderOrder;
                         }
-                        // Then by quantity group if enabled
-                        if (moveMultiQtyToEnd) {
-                            const aQtyGroup = getQuantitySortOrder(a.quantity);
-                            const bQtyGroup = getQuantitySortOrder(b.quantity);
-                            if (aQtyGroup !== bQtyGroup) {
-                                return aQtyGroup - bQtyGroup;
-                            }
-                        }
                         return a.pageIndex - b.pageIndex;
                     }
 
-                    // For grouped SKUs: use original sorting logic
-                    if (moveMultiQtyToEnd) {
-                        // First sort by quantity group: qty < 2 first, then qty >= 2
-                        const aQtyGroup = getQuantitySortOrder(a.quantity);
-                        const bQtyGroup = getQuantitySortOrder(b.quantity);
-                        if (aQtyGroup !== bQtyGroup) {
-                            return aQtyGroup - bQtyGroup;
-                        }
-                    }
-
-                    // Then sort by group within the same quantity group
+                    // 4. Then sort by group
                     const groupCompare = aGroup.localeCompare(bGroup);
                     if (groupCompare !== 0) {
                         return groupCompare;
                     }
 
-                    // Then sort by shipping provider within the same group and quantity group
+                    // 5. Then sort by shipping provider within the same group
                     const aProviderOrder = getProviderSortOrder(a.shippingProvider);
                     const bProviderOrder = getProviderSortOrder(b.shippingProvider);
                     if (aProviderOrder !== bProviderOrder) {
                         return aProviderOrder - bProviderOrder;
                     }
 
-                    // Finally sort by SKU within the same group, provider, and quantity group
+                    // 6. Finally sort by SKU within the same group and provider
                     return aSku.localeCompare(bSku);
                 });
-
                 // Create the PDF
                 const newPdfDoc = await PDFLib.PDFDocument.create();
 
