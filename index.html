@@ -46,6 +46,8 @@
 
 <body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
 
+    <div id="summary-pdf-export" class="fixed -left-[9999px] top-0 w-[760px] bg-[#f7f7f9] p-6" aria-hidden="true"></div>
+
     <div id="app" class="w-full max-w-4xl container-card p-6 sm:p-10 rounded-xl">
         <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
             <svg class="w-8 h-8 mr-3 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"
@@ -111,9 +113,10 @@
                     </div>
                     <div class="mt-4 flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
                         <label class="flex items-center gap-3 cursor-pointer">
-                            <input id="multi-qty-toggle" type="checkbox" checked onchange="moveMultiQtyToEnd = this.checked"
+                            <input id="multi-qty-toggle" type="checkbox" checked
+                                onchange="moveMultiQtyToEnd = this.checked"
                                 class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
-                            <span class="text-sm text-slate-900">Move  Multi-quantity orders to the end</span>
+                            <span class="text-sm text-slate-900">Move Multi-quantity orders to the end</span>
                         </label>
                         <span class="text-sm text-gray-500">Enabled by default</span>
                     </div>
@@ -172,14 +175,11 @@
                     </div>
                 </div>
 
-                <div class="mt-8 pt-6 border-t border-gray-300">
-                    <div class="flex justify-end">
-                        <button id="share-summary-button" onclick="shareSummaryImage()"
-                            class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
-                            Share Summary Image
-                        </button>
-                    </div>
-                    <div id="share-summary-card" class="hidden"></div>
+                <div class="mt-8 pt-6 border-t border-gray-300 flex justify-end">
+                    <button id="share-summary-button" onclick="shareSummaryPdf()"
+                        class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
+                        Share Summary PDF
+                    </button>
                 </div>
 
             </div>
@@ -214,8 +214,7 @@
                     <h3 class="text-lg font-semibold text-gray-700 mb-3">Detected SKUs (Click to add to group)</h3>
                     <!-- Search Input -->
                     <div class="mb-3">
-                        <input type="text" id="sku-search-input" 
-                            oninput="filterSkus(this.value)"
+                        <input type="text" id="sku-search-input" oninput="filterSkus(this.value)"
                             placeholder="Search SKUs..."
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
                     </div>
@@ -293,6 +292,8 @@
         let pdfDocumentData = null; // Store PDF data for reprocessing
         let accountNameCounts = {}; // Stores order counts by account name
         let providerNameCounts = {}; // Stores order counts by shipping provider
+        let summaryBreakdownMode = 'sku'; // 'sku' | 'custom-groups'
+        let summaryPdfShareInProgress = false;
         let processedPageData = [];
         let processedPagesRemoved = 0;
         let originalPageCount = 0;
@@ -414,13 +415,13 @@
             document.getElementById('result-area').classList.add('hidden');
             document.getElementById('error-area').classList.add('hidden');
             document.getElementById('grouping-section').classList.remove('hidden');
-            
+
             // Restore search input value for persistence
             const searchInput = document.getElementById('sku-search-input');
             if (searchInput) {
                 searchInput.value = currentSkuSearchText;
             }
-            
+
             renderDetectedSkus(currentSkuSearchText);
             renderGroups();
         }
@@ -448,6 +449,7 @@
             detectedSkuData = {};
             accountNameCounts = {}; // Reset account counts
             providerNameCounts = {}; // Reset provider counts
+            summaryBreakdownMode = 'sku';
             customGroups = [];
             groupCounter = 1;
             pdfDocumentData = null;
@@ -652,7 +654,7 @@
 
         function findTaxInvoiceCropY(textItems, pageHeight) {
             if (!cropTaxInvoice) return null;
-            
+
             let cropY = null;
             for (let item of textItems) {
                 if (item.str && item.str.toUpperCase().includes('TAX')) {
@@ -673,7 +675,7 @@
 
         function findTaxInvoiceCropY(textItems, pageHeight) {
             if (!cropTaxInvoice) return null;
-            
+
             let cropY = null;
             for (let item of textItems) {
                 if (item.str && item.str.toUpperCase().includes('TAX')) {
@@ -879,7 +881,7 @@
                     }
 
                     const sku = extractSku(rawText);
-                            const accountName = extractAccountName(rawText);
+                    const accountName = extractAccountName(rawText);
                     const shippingProvider = extractShippingProvider(rawText);
                     const quantity = extractQuantity(rawText);
 
@@ -934,7 +936,7 @@
                     throw new Error("No non-blank pages found in the uploaded PDF. Please check your source file.");
                 }
 
-                    if (showGroupingUI) {
+                if (showGroupingUI) {
                     // Store parsed data so user can choose which sorting mode to apply.
                     processedPageData = pageData;
                     processedPagesRemoved = pagesRemoved;
@@ -1064,7 +1066,7 @@
                 renderAccountCounts(); // Render account breakdown
                 renderProviderCounts(); // Render provider breakdown
                 renderSkuCounts();
-                renderShareSummaryCard();
+                summaryBreakdownMode = 'sku';
 
             } catch (error) {
                 console.error('Finalization error:', error);
@@ -1596,85 +1598,13 @@
                 renderAccountCounts(); // Render account breakdown for custom grouping too
                 renderProviderCounts();
                 renderCustomGroupSummary();
-                renderShareSummaryCard();
+                summaryBreakdownMode = 'custom-groups';
 
 
             } catch (error) {
                 console.error('Grouping error:', error);
                 updateStatus(`Failed to apply grouping: ${error.message}`, true);
             }
-        }
-
-        function renderShareSummaryCard() {
-            const shareCard = document.getElementById('share-summary-card');
-            if (!shareCard) return;
-
-            const providerEntries = Object.entries(providerNameCounts || {})
-                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-            const providerHtml = providerEntries.length
-                ? providerEntries.map(([providerName, count]) => {
-                    return `<div class="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-lg mb-2">
-                        <span class="font-medium text-slate-700">${providerName}</span>
-                        <span class="font-bold text-emerald-700">${count}</span>
-                    </div>`;
-                }).join('')
-                : '<p class="text-sm text-slate-500">No shipping provider data detected.</p>';
-
-            const groupHtml = customGroups.length
-                ? customGroups.map(group => {
-                    const totalOrders = group.skus.reduce((sum, skuKey) => {
-                        const data = detectedSkuData[skuKey];
-                        return sum + (data ? data.pages.length : 0);
-                    }, 0);
-                    return `<div class="rounded-xl border border-slate-200 bg-white p-3 mb-3">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="font-bold text-slate-800">${group.name}</span>
-                            <span class="font-bold ${group.color.text}">${totalOrders} orders</span>
-                        </div>
-                        <div class="space-y-1">${group.skus.map(skuKey => {
-                            const data = detectedSkuData[skuKey];
-                            if (!data) return '';
-                            return `<div class="flex justify-between text-sm text-slate-700"><span>${data.rawSku}</span><span>${data.pages.length}</span></div>`;
-                        }).join('')}</div>
-                    </div>`;
-                }).join('')
-                : '<p class="text-sm text-slate-500">No custom groups were applied yet.</p>';
-
-            const totalOrders = providerEntries.reduce((sum, [, count]) => sum + count, 0);
-            const groupCount = customGroups.length;
-            const currentDate = new Date().toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            });
-
-            shareCard.className = 'p-6 bg-white rounded-2xl border border-slate-200 shadow-lg max-w-2xl mx-auto';
-            shareCard.innerHTML = `
-                <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-xl mb-4">
-                    <div class="text-xs uppercase tracking-[0.24em] opacity-80">Meesho Summary</div>
-                    <div class="text-2xl font-bold mt-1">Custom Groups Summary</div>
-                    <div class="text-sm opacity-90 mt-1">Shipping Provider Breakdown</div>
-                    <div class="text-xs opacity-80 mt-2">Generated on: ${currentDate}</div>
-                </div>
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="bg-slate-50 rounded-xl p-3">
-                        <div class="text-xs text-slate-500">Total Orders</div>
-                        <div class="text-2xl font-bold text-slate-800">${totalOrders}</div>
-                    </div>
-                    <div class="bg-slate-50 rounded-xl p-3">
-                        <div class="text-xs text-slate-500">Custom Groups</div>
-                        <div class="text-2xl font-bold text-slate-800">${groupCount}</div>
-                    </div>
-                </div>
-                <div class="mb-4">
-                    <div class="text-lg font-bold text-slate-800 mb-2">Custom Groups Summary</div>
-                    ${groupHtml}
-                </div>
-                <div>
-                    <div class="text-lg font-bold text-slate-800 mb-2">Shipping Provider Breakdown</div>
-                    ${providerHtml}
-                </div>
-            `;
         }
 
         function appendCollapsibleGroupSummaryCard(container, { title, totalOrders, detailsHtml, cardClass, titleClass, countClass }) {
@@ -1775,56 +1705,190 @@
             }
         }
 
-        async function createSummaryImageBlob() {
-            const shareCard = document.getElementById('share-summary-card');
-            if (!shareCard) {
-                throw new Error('Summary card is not ready yet.');
-            }
-
-            renderShareSummaryCard();
-            const canvas = await html2canvas(shareCard, {
-                backgroundColor: '#ffffff',
-                scale: 2,
-                useCORS: true,
-                logging: false
-            });
-
-            return new Promise((resolve, reject) => {
-                canvas.toBlob((blob) => {
-                    if (!blob) {
-                        reject(new Error('Unable to create image blob.'));
-                        return;
-                    }
-                    resolve(blob);
-                }, 'image/png');
-            });
+        function getTodayPdfFilename() {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            return `${day}-${month}-${year}.pdf`;
         }
 
-        async function shareSummaryImage() {
+        function sanitizePdfText(text) {
+            return String(text || '')
+                .replace(/[^\x20-\x7E]/g, '?')
+                .trim();
+        }
+
+        function createSummaryPdfBuilder(pdfDoc, regularFont, boldFont) {
+            const PAGE_WIDTH = 595;
+            const PAGE_HEIGHT = 842;
+            const MARGIN = 50;
+            const context = {
+                pdfDoc,
+                page: pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]),
+                y: PAGE_HEIGHT - MARGIN,
+                regularFont,
+                boldFont,
+            };
+
+            function ensureSpace(height = 20) {
+                if (context.y - height < MARGIN) {
+                    context.page = context.pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+                    context.y = PAGE_HEIGHT - MARGIN;
+                }
+            }
+
+            function drawLine(text, options = {}) {
+                const { size = 11, indent = 0, bold = false } = options;
+                const font = bold ? context.boldFont : context.regularFont;
+                ensureSpace(size + 8);
+                context.page.drawText(sanitizePdfText(text), {
+                    x: MARGIN + indent,
+                    y: context.y,
+                    size,
+                    font,
+                });
+                context.y -= size + 8;
+            }
+
+            function drawSectionTitle(title) {
+                ensureSpace(28);
+                context.y -= 10;
+                drawLine(title, { size: 14, bold: true });
+                context.y -= 2;
+            }
+
+            function drawRow(label, value, indent = 0) {
+                const maxLabelLen = 58;
+                let displayLabel = sanitizePdfText(label);
+                if (displayLabel.length > maxLabelLen) {
+                    displayLabel = `${displayLabel.slice(0, maxLabelLen - 3)}...`;
+                }
+
+                ensureSpace(16);
+                context.page.drawText(displayLabel, {
+                    x: MARGIN + indent,
+                    y: context.y,
+                    size: 11,
+                    font: context.regularFont,
+                });
+                context.page.drawText(String(value), {
+                    x: PAGE_WIDTH - MARGIN - 30,
+                    y: context.y,
+                    size: 11,
+                    font: context.boldFont,
+                });
+                context.y -= 16;
+            }
+
+            return { drawLine, drawSectionTitle, drawRow };
+        }
+
+        async function buildSummaryPdfBytes() {
+            const exportContainer = document.getElementById('summary-pdf-export');
+            const resultArea = document.getElementById('result-area');
+
+            // 1. Clone the UI into the hidden container
+            exportContainer.innerHTML = `
+        <div class="mb-6 pb-4 border-b border-gray-300">
+            <h2 class="text-2xl font-bold text-gray-800">Meesho Label Summary</h2>
+            <p class="text-gray-500">Date: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+        </div>
+        ${resultArea.innerHTML}
+    `;
+
+            // 2. Remove the specific action buttons so they don't appear in the PDF
+            const downloadBtn = exportContainer.querySelector('#download-button');
+            const shareBtn = exportContainer.querySelector('#share-summary-button');
+            if (downloadBtn) downloadBtn.remove();
+            if (shareBtn) shareBtn.remove();
+
+            // 3. Selectively expand ONLY the "Ungrouped SKUs" section
+            const groupToggles = exportContainer.querySelectorAll('.group-summary-toggle');
+            groupToggles.forEach(toggle => {
+                const titleElement = toggle.querySelector('h4');
+                const detailsElement = toggle.nextElementSibling; // This grabs the .group-summary-details div
+
+                if (titleElement && titleElement.textContent.trim() === 'Ungrouped SKUs') {
+                    // Expand only the ungrouped items
+                    if (detailsElement) {
+                        detailsElement.classList.remove('hidden');
+                    }
+                }
+
+                // Remove the chevron icon for all items so it looks like a static report, not a broken button
+                const chevron = toggle.querySelector('.group-summary-chevron');
+                if (chevron) chevron.remove();
+            });
+
+            // Make sure the export container is temporarily visible to html2canvas
+            exportContainer.style.left = '0';
+            exportContainer.style.zIndex = '-100';
+
             try {
-                const blob = await createSummaryImageBlob();
-                const file = new File([blob], 'custom-groups-summary.png', { type: 'image/png' });
+                // 4. Generate a high-quality canvas
+                const canvas = await html2canvas(exportContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#f7f7f9',
+                    windowWidth: 760
+                });
+
+                // 5. Create a new PDF and embed the captured image
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const imgData = canvas.toDataURL('image/png');
+                const pngImage = await pdfDoc.embedPng(imgData);
+
+                // 6. Scale the image to fit a standard width
+                const PAGE_WIDTH = 595.28;
+                const imgDims = pngImage.scale(1);
+                const scaleFactor = PAGE_WIDTH / imgDims.width;
+                const scaledHeight = imgDims.height * scaleFactor;
+
+                const page = pdfDoc.addPage([PAGE_WIDTH, scaledHeight]);
+
+                page.drawImage(pngImage, {
+                    x: 0,
+                    y: 0,
+                    width: PAGE_WIDTH,
+                    height: scaledHeight,
+                });
+
+                return await pdfDoc.save();
+
+            } finally {
+                // 7. Always reset the export container back to its hidden state
+                exportContainer.innerHTML = '';
+                exportContainer.style.left = '-9999px';
+                exportContainer.style.zIndex = 'auto';
+            }
+        }
+        async function shareSummaryPdf() {
+            try {
+                const pdfBytes = await buildSummaryPdfBytes();
+                const filename = getTodayPdfFilename();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const file = new File([blob], filename, { type: 'application/pdf' });
 
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                     await navigator.share({
-                        title: 'Custom Groups Summary',
-                        text: 'Here is the custom groups and shipping provider summary.',
+                        title: 'Meesho Label Summary',
                         files: [file]
                     });
-                    showNotification('Summary image shared successfully.', 'success');
+                    showNotification('Summary PDF shared successfully.', 'success');
                     return;
                 }
 
-                const imageUrl = URL.createObjectURL(blob);
+                const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
-                link.href = imageUrl;
-                link.download = 'custom-groups-summary.png';
+                link.href = url;
+                link.download = filename;
                 link.click();
-                setTimeout(() => URL.revokeObjectURL(imageUrl), 2000);
-                showNotification('Image downloaded. You can now share it in WhatsApp manually.', 'success');
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+                showNotification('Summary PDF downloaded.', 'success');
             } catch (error) {
-                console.error('Share image failed:', error);
-                showNotification('Unable to create the image right now. Please try again.', 'error');
+                console.error('Share summary PDF failed:', error);
+                showNotification('Unable to create summary PDF. Please try again.', 'error');
             }
         }
 
@@ -1834,13 +1898,13 @@
                 groupCounter = 1;
                 currentSkuSearchText = ''; // Clear search text
                 clearStoredGroups(); // Clear from storage
-                
+
                 // Clear search input
                 const searchInput = document.getElementById('sku-search-input');
                 if (searchInput) {
                     searchInput.value = '';
                 }
-                
+
                 renderGroups();
                 renderDetectedSkus('');
             }
