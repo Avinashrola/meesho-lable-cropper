@@ -707,11 +707,13 @@
                 .map(([key, value]) => ({ key, ...value }))
                 .sort((a, b) => a.key.localeCompare(b.key));
 
-            sortedCounts.forEach(data => {
+            const rowColors = ['bg-slate-50', 'bg-emerald-50', 'bg-indigo-50'];
+            sortedCounts.forEach((data, index) => {
                 const cleanSkuName = data.rawSku.trim();
+                const rowBg = rowColors[index % rowColors.length];
 
                 const item = document.createElement('div');
-                item.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm';
+                item.className = `flex items-center justify-between p-3 border border-gray-200 rounded-lg shadow-sm ${rowBg}`;
                 item.innerHTML = `
                     <p class="font-medium text-gray-800 break-all mr-4">
                         ${cleanSkuName}
@@ -1095,6 +1097,13 @@
 
             let skus = Object.keys(detectedSkuData);
 
+            // Sort SKUs alphabetically by raw SKU value for consistent display
+            skus.sort((a, b) => {
+                const rawA = detectedSkuData[a].rawSku || a;
+                const rawB = detectedSkuData[b].rawSku || b;
+                return rawA.localeCompare(rawB, undefined, { sensitivity: 'base' });
+            });
+
             // Apply filter if search text is provided
             if (filterText.trim() !== '') {
                 const searchLower = filterText.toLowerCase();
@@ -1456,7 +1465,7 @@
                     .sort((a, b) => {
                         const rawA = detectedSkuData[a].rawSku || a;
                         const rawB = detectedSkuData[b].rawSku || b;
-                        return rawA.localeCompare(rawB);
+                        return rawA.localeCompare(rawB, undefined, { sensitivity: 'base' });
                     });
                 ungroupedSkus.forEach(skuKey => {
                     const data = detectedSkuData[skuKey];
@@ -1651,10 +1660,12 @@
                     return sum;
                 }, 0);
 
-                const skuDetails = group.skus.map(skuKey => {
+                const groupRowColors = ['bg-slate-50', 'bg-emerald-50', 'bg-indigo-50'];
+                const skuDetails = group.skus.map((skuKey, index) => {
                     const data = detectedSkuData[skuKey];
                     if (data) {
-                        return `<div class="flex justify-between items-center bg-white px-3 py-2 rounded mb-2">
+                        const rowBg = groupRowColors[index % groupRowColors.length];
+                        return `<div class="flex justify-between items-center ${rowBg} px-3 py-2 rounded mb-2">
                         <span class="text-sm text-gray-700">${data.rawSku}</span>
                         <span class="font-semibold ${group.color.text}">${data.pages.length}</span>
                     </div>`;
@@ -1673,12 +1684,20 @@
             });
 
             const allGroupedSkus = new Set(customGroups.flatMap(g => g.skus));
-            const ungroupedSkus = Object.keys(detectedSkuData).filter(sku => !allGroupedSkus.has(sku));
+            const ungroupedSkus = Object.keys(detectedSkuData)
+                .filter(sku => !allGroupedSkus.has(sku))
+                .sort((a, b) => {
+                    const rawA = detectedSkuData[a].rawSku || a;
+                    const rawB = detectedSkuData[b].rawSku || b;
+                    return rawA.localeCompare(rawB, undefined, { sensitivity: 'base' });
+                });
 
             if (ungroupedSkus.length > 0) {
-                const ungroupedDetails = ungroupedSkus.map(skuKey => {
+                const rowColors = ['bg-slate-50', 'bg-emerald-50', 'bg-indigo-50'];
+                const ungroupedDetails = ungroupedSkus.map((skuKey, index) => {
                     const data = detectedSkuData[skuKey];
-                    return `<div class="flex justify-between items-center bg-white px-3 py-2 rounded mb-2">
+                    const rowBg = rowColors[index % rowColors.length];
+                    return `<div class="flex justify-between items-center ${rowBg} px-3 py-2 rounded mb-2">
                         <span class="text-sm text-gray-700">${data.rawSku}</span>
                         <span class="font-semibold text-gray-600">${data.pages.length}</span>
                     </div>`;
