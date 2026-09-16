@@ -114,15 +114,42 @@
                     <div class="mt-4 flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input id="multi-qty-toggle" type="checkbox" checked
-                                onchange="moveMultiQtyToEnd = this.checked"
+                                onchange="moveMultiQtyToEnd = this.checked; saveSortPreferences()"
                                 class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
                             <span class="text-sm text-slate-900">Move Multi-quantity orders to the end</span>
                         </label>
                         <span class="text-sm text-gray-500">Enabled by default</span>
                     </div>
+                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input id="size-sort-toggle" type="checkbox" checked
+                                    onchange="syncSortOption('size', this.checked)"
+                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                                <span class="text-sm text-slate-900">Size-wise sorting</span>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input id="color-sort-toggle" type="checkbox" checked
+                                    onchange="syncSortOption('color', this.checked)"
+                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                                <span class="text-sm text-slate-900">Color-wise sorting</span>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                <input id="courier-sort-toggle" type="checkbox"
+                                    onchange="syncSortOption('courier', this.checked)"
+                                    class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+                                <span class="text-sm text-slate-900">Courier-wise sorting</span>
+                            </label>
+                        </div>
+                    </div>
                     <div class="mt-3 flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
                         <label class="flex items-center gap-3 cursor-pointer">
-                            <input id="crop-tax-toggle" type="checkbox" checked onchange="cropTaxInvoice = this.checked"
+                            <input id="crop-tax-toggle" type="checkbox" checked
+                                onchange="cropTaxInvoice = this.checked; saveSortPreferences()"
                                 class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
                             <span class="text-sm text-slate-900">Crop TAX INVOICE section</span>
                         </label>
@@ -212,6 +239,33 @@
                 </div>
                 <p class="text-gray-600 mb-6">Create custom groups and assign SKUs to organize your labels exactly how
                     you want.</p>
+
+                <div class="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="flex items-center gap-3 p-4 bg-white border border-purple-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="grouping-size-sort-toggle" type="checkbox" checked
+                                onchange="syncSortOption('size', this.checked)"
+                                class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
+                            <span class="text-sm text-slate-900">Size-wise sorting</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-3 p-4 bg-white border border-purple-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="grouping-color-sort-toggle" type="checkbox" checked
+                                onchange="syncSortOption('color', this.checked)"
+                                class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
+                            <span class="text-sm text-slate-900">Color-wise sorting</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-3 p-4 bg-white border border-purple-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="grouping-courier-sort-toggle" type="checkbox"
+                                onchange="syncSortOption('courier', this.checked)"
+                                class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
+                            <span class="text-sm text-slate-900">Courier-wise sorting</span>
+                        </label>
+                    </div>
+                </div>
 
                 <!-- Detected SKUs List -->
                 <div class="mb-6">
@@ -303,12 +357,16 @@
         let originalPageCount = 0;
         let moveMultiQtyToEnd = true;
         let cropTaxInvoice = true;
+        let sortBySize = true;
+        let sortByColor = true;
+        let sortByCourier = false;
         let currentSkuSearchText = ''; // Stores the current search text for persistence
 
         // Storage keys
         const STORAGE_KEYS = {
             GROUPS: 'meesho_custom_groups',
-            GROUP_COUNTER: 'meesho_group_counter'
+            GROUP_COUNTER: 'meesho_group_counter',
+            SORT_PREFS: 'meesho_sort_preferences'
         };
 
         // Color palette for groups
@@ -393,6 +451,89 @@
             document.getElementById('summary-output').textContent = summary;
         }
 
+        function saveSortPreferences() {
+            try {
+                const prefs = {
+                    moveMultiQtyToEnd,
+                    cropTaxInvoice,
+                    sortBySize,
+                    sortByColor,
+                    sortByCourier
+                };
+                localStorage.setItem(STORAGE_KEYS.SORT_PREFS, JSON.stringify(prefs));
+            } catch (error) {
+                console.error('Failed to save sort preferences:', error);
+            }
+        }
+
+        function loadSortPreferences() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEYS.SORT_PREFS);
+                if (!saved) {
+                    syncSortOptionToggles();
+                    return false;
+                }
+                const prefs = JSON.parse(saved);
+                if (typeof prefs.moveMultiQtyToEnd === 'boolean') {
+                    moveMultiQtyToEnd = prefs.moveMultiQtyToEnd;
+                }
+                if (typeof prefs.cropTaxInvoice === 'boolean') {
+                    cropTaxInvoice = prefs.cropTaxInvoice;
+                }
+                if (typeof prefs.sortBySize === 'boolean') {
+                    sortBySize = prefs.sortBySize;
+                }
+                if (typeof prefs.sortByColor === 'boolean') {
+                    sortByColor = prefs.sortByColor;
+                }
+                if (typeof prefs.sortByCourier === 'boolean') {
+                    sortByCourier = prefs.sortByCourier;
+                }
+                syncSortOptionToggles();
+                const qtyToggle = document.getElementById('multi-qty-toggle');
+                if (qtyToggle) {
+                    qtyToggle.checked = moveMultiQtyToEnd;
+                }
+                const taxToggle = document.getElementById('crop-tax-toggle');
+                if (taxToggle) {
+                    taxToggle.checked = cropTaxInvoice;
+                }
+                return true;
+            } catch (error) {
+                console.error('Failed to load sort preferences:', error);
+                return false;
+            }
+        }
+
+        function syncSortOption(option, checked) {
+            if (option === 'size') {
+                sortBySize = checked;
+            } else if (option === 'color') {
+                sortByColor = checked;
+            } else if (option === 'courier') {
+                sortByCourier = checked;
+            }
+            syncSortOptionToggles();
+            saveSortPreferences();
+        }
+
+        function syncSortOptionToggles() {
+            const pairs = [
+                ['size-sort-toggle', sortBySize],
+                ['color-sort-toggle', sortByColor],
+                ['courier-sort-toggle', sortByCourier],
+                ['grouping-size-sort-toggle', sortBySize],
+                ['grouping-color-sort-toggle', sortByColor],
+                ['grouping-courier-sort-toggle', sortByCourier]
+            ];
+            pairs.forEach(([id, value]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.checked = value;
+                }
+            });
+        }
+
         function showSortingOptions() {
             document.getElementById('loading-indicator').classList.add('hidden');
             document.getElementById('result-area').classList.add('hidden');
@@ -406,6 +547,7 @@
             if (taxToggle) {
                 taxToggle.checked = cropTaxInvoice;
             }
+            syncSortOptionToggles();
             document.getElementById('sort-options-area').classList.remove('hidden');
         }
 
@@ -428,6 +570,7 @@
 
             renderDetectedSkus(currentSkuSearchText);
             renderGroups();
+            syncSortOptionToggles();
         }
 
         function applySortingMode(mode) {
@@ -460,14 +603,202 @@
             processedPageData = [];
             processedPagesRemoved = 0;
             originalPageCount = 0;
-            moveMultiQtyToEnd = true;
-            cropTaxInvoice = true;
+            loadSortPreferences();
         }
 
         function normalizeSkuForGrouping(sku) {
             let strippedSku = sku.replace(/\s+\d+$/g, '');
             strippedSku = strippedSku.replace(/(\s\d+)/g, '');
             return strippedSku;
+        }
+
+        function getSizeSortOrder(size) {
+            if (!size) return 999;
+            const normalized = String(size).toUpperCase().replace(/\s+/g, ' ').trim();
+            const order = {
+                'XXXS': 1,
+                'XXS': 2,
+                'XS': 3,
+                'S': 4,
+                'M': 5,
+                'L': 6,
+                'XL': 7,
+                'XXL': 8,
+                '2XL': 8,
+                'XXXL': 9,
+                '3XL': 9,
+                '4XL': 10,
+                '5XL': 11,
+                '6XL': 12,
+                'FREE': 50,
+                'FREE SIZE': 50,
+                'FREESIZE': 50,
+                'ONESIZE': 50,
+                'ONE SIZE': 50,
+                'OS': 50,
+                'NA': 90
+            };
+            if (order[normalized] !== undefined) {
+                return order[normalized];
+            }
+            // Numeric sizes (e.g. 28, 30, 32)
+            if (/^\d+(\.\d+)?$/.test(normalized)) {
+                return 100 + parseFloat(normalized);
+            }
+            return 200;
+        }
+
+        function parseProductRow(rawText) {
+            const empty = { skuCode: '', size: '', qty: '', color: '', descriptiveSku: '' };
+
+            const skuRowPattern = /SKU\s*Size\s*Qty\s*Color\s*Order No\.\s*(\S+)\s+(Free\s*Size|\S+)\s+(\d+)\s+(.+?)\s+(\d{10,}_\d+)(?=\s*TAX INVOICE|\s|$)/i;
+            const skuRowMatch = rawText.match(skuRowPattern);
+            if (skuRowMatch) {
+                const skuCode = skuRowMatch[1].trim();
+                const size = skuRowMatch[2].replace(/\s+/g, ' ').trim();
+                const qty = skuRowMatch[3].trim();
+                const color = skuRowMatch[4].trim();
+                return {
+                    skuCode,
+                    size,
+                    qty,
+                    color,
+                    descriptiveSku: `${skuCode} ${size} ${qty} ${color}`.trim()
+                };
+            }
+
+            const fallbackSkuPattern = /SKU\s*Size\s*Qty\s*Color\s*Order No\.\s*([^\r\n]+?)(?=\s*(?:\d{10,}_\d+|TAX INVOICE))/i;
+            const fallbackMatch = rawText.match(fallbackSkuPattern);
+            if (fallbackMatch && fallbackMatch[1]) {
+                const parts = fallbackMatch[1].replace(/\s+/g, ' ').trim().split(' ');
+                const skuCode = parts[0] || '';
+                let size = '';
+                let qty = '';
+                let color = '';
+                if (parts.length >= 2 && /^free$/i.test(parts[1]) && parts[2] && /^size$/i.test(parts[2])) {
+                    size = 'Free Size';
+                    qty = parts[3] || '';
+                    color = parts.slice(4).join(' ');
+                } else {
+                    size = parts[1] || '';
+                    qty = parts[2] || '';
+                    color = parts.slice(3).join(' ');
+                }
+                return {
+                    skuCode,
+                    size,
+                    qty,
+                    color,
+                    descriptiveSku: fallbackMatch[1].replace(/\s+/g, ' ').trim()
+                };
+            }
+
+            return empty;
+        }
+
+        function compareBySkuThenSize(a, b, options = {}) {
+            const preferSize = options.forceSizeFirst === true ? true : (options.forceSizeFirst === false ? false : sortBySize);
+            const preferColor = options.forceColorOff === true ? false : sortByColor;
+
+            // When size-wise is on, size is primary so same sizes stay together across SKUs.
+            if (preferSize) {
+                const sizeCompare = getSizeSortOrder(a.size) - getSizeSortOrder(b.size);
+                if (sizeCompare !== 0) {
+                    return sizeCompare;
+                }
+
+                const sizeLabelCompare = (a.size || '').localeCompare(b.size || '', undefined, { sensitivity: 'base' });
+                if (sizeLabelCompare !== 0) {
+                    return sizeLabelCompare;
+                }
+            }
+
+            if (preferColor) {
+                const colorCompare = (a.color || '').localeCompare(b.color || '', undefined, { sensitivity: 'base' });
+                if (colorCompare !== 0) {
+                    return colorCompare;
+                }
+            }
+
+            const skuCodeCompare = (a.skuCode || '').localeCompare(b.skuCode || '', undefined, { sensitivity: 'base' });
+            if (skuCodeCompare !== 0) {
+                return skuCodeCompare;
+            }
+
+            return (a.sku || '').localeCompare(b.sku || '');
+        }
+
+        /**
+         * Page comparator for smart grouping / SKU export.
+         * - custom groups + courier on: Courier → size/color/SKU
+         * - ungrouped (or SKU mode) + courier on: size/color/SKU → Courier
+         */
+        function comparePagesWithSortOptions(a, b, options = {}) {
+            const courierPrimary = options.courierPrimary === true && sortByCourier;
+
+            if (courierPrimary) {
+                const providerCompare = getProviderSortOrder(a.shippingProvider) - getProviderSortOrder(b.shippingProvider);
+                if (providerCompare !== 0) {
+                    return providerCompare;
+                }
+            }
+
+            const skuCompare = compareBySkuThenSize(a, b, options);
+            if (skuCompare !== 0) {
+                return skuCompare;
+            }
+
+            if (sortByCourier && !courierPrimary) {
+                const providerCompare = getProviderSortOrder(a.shippingProvider) - getProviderSortOrder(b.shippingProvider);
+                if (providerCompare !== 0) {
+                    return providerCompare;
+                }
+            }
+
+            return (a.pageIndex || 0) - (b.pageIndex || 0);
+        }
+
+        function compareDetectedSkuKeys(aKey, bKey, options = {}) {
+            const dataA = detectedSkuData[aKey] || uniqueSkuCounts[aKey] || {};
+            const dataB = detectedSkuData[bKey] || uniqueSkuCounts[bKey] || {};
+            const fallbackA = parseSizeColorFromRawSku(dataA.rawSku || aKey);
+            const fallbackB = parseSizeColorFromRawSku(dataB.rawSku || bKey);
+            return compareBySkuThenSize({
+                skuCode: dataA.skuCode || fallbackA.skuCode,
+                size: dataA.size || fallbackA.size,
+                color: dataA.color || fallbackA.color,
+                sku: aKey
+            }, {
+                skuCode: dataB.skuCode || fallbackB.skuCode,
+                size: dataB.size || fallbackB.size,
+                color: dataB.color || fallbackB.color,
+                sku: bKey
+            }, options);
+        }
+
+        function parseSizeColorFromRawSku(rawSku) {
+            const text = String(rawSku || '').replace(/\s+/g, ' ').trim();
+            if (!text) {
+                return { skuCode: '', size: '', color: '' };
+            }
+            const freeMatch = text.match(/^(\S+)\s+(Free\s*Size)\s+(\d+)?\s*(.*)$/i);
+            if (freeMatch) {
+                return {
+                    skuCode: freeMatch[1],
+                    size: 'Free Size',
+                    color: (freeMatch[4] || '').trim()
+                };
+            }
+            const parts = text.split(' ');
+            return {
+                skuCode: parts[0] || '',
+                size: parts[1] || '',
+                color: parts.slice(3).join(' ') || parts.slice(2).join(' ')
+            };
+        }
+
+        function sortSkuKeysByPreferences(skuKeys, options = {}) {
+            return [...skuKeys].sort((a, b) => compareDetectedSkuKeys(a, b, options));
         }
 
         /**
@@ -585,20 +916,22 @@
 
         function extractSku(rawText) {
             let descriptiveSku = '';
+            let skuCode = '';
+            let size = '';
+            let color = '';
 
-            const skuPattern1 = /(?:SKU\s*Size\s*Qty\s*Color\s*Order No\.)\s*([^\r\n]+?)\s*(?:Size|Qty|Color|Free Size)/i;
-            let skuMatch1 = rawText.match(skuPattern1);
-
-            if (skuMatch1 && skuMatch1[1]) {
-                descriptiveSku = skuMatch1[1].trim();
+            const parsed = parseProductRow(rawText);
+            if (parsed.descriptiveSku) {
+                descriptiveSku = parsed.descriptiveSku;
+                skuCode = parsed.skuCode;
+                size = parsed.size;
+                color = parsed.color;
             }
 
-            if (!descriptiveSku) {
-                const fallbackSkuPattern = /SKU\s*[:#]?\s*([^\r\n]+?)\s*(?:Size|Qty|Color|Order No|TAX INVOICE)/i;
-                let fallbackMatch = rawText.match(fallbackSkuPattern);
-                if (fallbackMatch && fallbackMatch[1]) {
-                    descriptiveSku = fallbackMatch[1].trim();
-                }
+            // Guard: never treat a huge invoice dump as the SKU name
+            if (descriptiveSku && (descriptiveSku.length > 80 || /TAX INVOICE|BILL TO|Sold by/i.test(descriptiveSku))) {
+                const shortMatch = descriptiveSku.match(/^(\S+(?:\s+\S+){0,4})/);
+                descriptiveSku = shortMatch ? shortMatch[1].trim() : '';
             }
 
             if (descriptiveSku && descriptiveSku.length > 2) {
@@ -609,13 +942,22 @@
                 if (!uniqueSkuCounts[sortingKey]) {
                     uniqueSkuCounts[sortingKey] = {
                         rawSku: descriptiveSku,
+                        skuCode: skuCode || descriptiveSku.split(/\s+/)[0] || '',
+                        size: size || '',
+                        color: color || '',
                         count: 1
                     };
                 } else {
                     uniqueSkuCounts[sortingKey].count++;
                 }
 
-                return sortingKey;
+                return {
+                    sortingKey,
+                    rawSku: descriptiveSku,
+                    skuCode: skuCode || descriptiveSku.split(/\s+/)[0] || '',
+                    size: size || '',
+                    color: color || ''
+                };
             }
 
             const hsnMatch = rawText.match(/(?:HSN|SKU)\s*([0-9]{6,10})|("HSN"\s*,"Qty"\s*,"Gross Amount"\s*,"Discount"\s*[^,]+,\s*"([0-9]{6,10}))/i);
@@ -626,22 +968,43 @@
                 if (!uniqueSkuCounts[sortingKey]) {
                     uniqueSkuCounts[sortingKey] = {
                         rawSku: `HSN: ${hsnCode}`,
+                        skuCode: hsnCode,
+                        size: '',
+                        color: '',
                         count: 1
                     };
                 } else {
                     uniqueSkuCounts[sortingKey].count++;
                 }
 
-                return sortingKey;
+                return {
+                    sortingKey,
+                    rawSku: `HSN: ${hsnCode}`,
+                    skuCode: hsnCode,
+                    size: '',
+                    color: ''
+                };
             }
 
             const purchaseOrderMatch = rawText.match(/Purchase Order\s*(\d{10,20})/);
             if (purchaseOrderMatch) {
                 const orderId = purchaseOrderMatch[1].trim();
-                return 'ORDER-' + orderId;
+                return {
+                    sortingKey: 'ORDER-' + orderId,
+                    rawSku: `Order: ${orderId}`,
+                    skuCode: orderId,
+                    size: '',
+                    color: ''
+                };
             }
 
-            return 'UNKNOWN_SORT_FALLBACK';
+            return {
+                sortingKey: 'UNKNOWN_SORT_FALLBACK',
+                rawSku: 'Unknown SKU',
+                skuCode: 'UNKNOWN',
+                size: '',
+                color: ''
+            };
         }
 
         async function getTextFromPdfPage(pdfDocument, pageNumber) {
@@ -705,7 +1068,7 @@
 
             const sortedCounts = Object.entries(uniqueSkuCounts)
                 .map(([key, value]) => ({ key, ...value }))
-                .sort((a, b) => a.key.localeCompare(b.key));
+                .sort((a, b) => compareBySkuThenSize(a, b));
 
             const rowColors = ['bg-slate-50', 'bg-emerald-50', 'bg-indigo-50'];
             sortedCounts.forEach((data, index) => {
@@ -886,7 +1249,8 @@
                         continue;
                     }
 
-                    const sku = extractSku(rawText);
+                    const skuInfo = extractSku(rawText);
+                    const sku = skuInfo.sortingKey;
                     const accountName = extractAccountName(rawText);
                     const shippingProvider = extractShippingProvider(rawText);
                     const quantity = extractQuantity(rawText);
@@ -915,6 +1279,9 @@
                     pageData.push({
                         pageIndex: pageIndex,
                         sku: sku,
+                        skuCode: skuInfo.skuCode,
+                        size: skuInfo.size,
+                        color: skuInfo.color,
                         accountName: accountName,
                         shippingProvider: shippingProvider,
                         quantity: quantity,
@@ -925,7 +1292,10 @@
                     // Store in detectedSkuData for grouping UI
                     if (!detectedSkuData[sku]) {
                         detectedSkuData[sku] = {
-                            rawSku: uniqueSkuCounts[sku]?.rawSku || sku,
+                            rawSku: uniqueSkuCounts[sku]?.rawSku || skuInfo.rawSku || sku,
+                            skuCode: skuInfo.skuCode,
+                            size: skuInfo.size,
+                            color: skuInfo.color,
                             pages: []
                         };
                     }
@@ -933,6 +1303,9 @@
                         pageIndex: pageIndex,
                         shippingProvider: shippingProvider,
                         quantity: quantity,
+                        size: skuInfo.size,
+                        color: skuInfo.color,
+                        skuCode: skuInfo.skuCode,
                         cropY: cropY
                     });
                 }
@@ -1003,13 +1376,14 @@
                         if (providerCompare !== 0) {
                             return providerCompare;
                         }
-                        const skuCompare = a.sku.localeCompare(b.sku);
-                        if (skuCompare !== 0) {
-                            return skuCompare;
+                        const skuSizeCompare = compareBySkuThenSize(a, b);
+                        if (skuSizeCompare !== 0) {
+                            return skuSizeCompare;
                         }
                         return getQuantitySortOrder(a.quantity) - getQuantitySortOrder(b.quantity);
                     });
                 } else {
+                    // SKU wise: size/color if enabled, then courier if enabled
                     sortedPageData.sort((a, b) => {
                         if (moveMultiQtyToEnd) {
                             const aQtyGroup = getQuantitySortOrder(a.quantity);
@@ -1018,15 +1392,7 @@
                                 return aQtyGroup - bQtyGroup;
                             }
                         }
-                        const skuCompare = a.sku.localeCompare(b.sku);
-                        if (skuCompare !== 0) {
-                            return skuCompare;
-                        }
-                        const providerCompare = getProviderSortOrder(a.shippingProvider) - getProviderSortOrder(b.shippingProvider);
-                        if (providerCompare !== 0) {
-                            return providerCompare;
-                        }
-                        return getQuantitySortOrder(a.quantity) - getQuantitySortOrder(b.quantity);
+                        return comparePagesWithSortOptions(a, b, { courierPrimary: false });
                     });
                 }
 
@@ -1067,7 +1433,14 @@
                 sortedPdfBytes = await newPdfDoc.save();
 
                 const summary = `Original Pages: ${originalNumPages} | Pages Kept: ${sortedPageData.length} | Pages Removed: ${pagesRemoved}`;
-                const modeLabel = sortMode === 'provider' ? 'Shipping Provider' : 'SKU';
+                let modeLabel = 'Shipping Provider';
+                if (sortMode !== 'provider') {
+                    const extras = [];
+                    if (sortBySize) extras.push('Size');
+                    if (sortByColor) extras.push('Color');
+                    if (sortByCourier) extras.push('Courier');
+                    modeLabel = extras.length ? `SKU + ${extras.join(' + ')}` : 'SKU';
+                }
                 showResult(`${modeLabel} Sorting and Cropping Complete!`, summary);
                 renderAccountCounts(); // Render account breakdown
                 renderProviderCounts(); // Render provider breakdown
@@ -1097,11 +1470,21 @@
 
             let skus = Object.keys(detectedSkuData);
 
-            // Sort SKUs alphabetically by raw SKU value for consistent display
+            // Sort SKUs by product code, then size (S→M→L→XL), then color
             skus.sort((a, b) => {
-                const rawA = detectedSkuData[a].rawSku || a;
-                const rawB = detectedSkuData[b].rawSku || b;
-                return rawA.localeCompare(rawB, undefined, { sensitivity: 'base' });
+                const dataA = detectedSkuData[a] || {};
+                const dataB = detectedSkuData[b] || {};
+                return compareBySkuThenSize({
+                    skuCode: dataA.skuCode,
+                    size: dataA.size,
+                    color: dataA.color,
+                    sku: a
+                }, {
+                    skuCode: dataB.skuCode,
+                    size: dataB.size,
+                    color: dataB.color,
+                    sku: b
+                });
             });
 
             // Apply filter if search text is provided
@@ -1421,34 +1804,40 @@
                 document.getElementById('grouping-section').classList.add('hidden');
 
                 const pageData = [];
+                // Respect size/color checkboxes (do not force size-first)
+                const smartSortOptions = {};
+                const groupedPageOptions = { ...smartSortOptions, courierPrimary: true };
+                const ungroupedPageOptions = { ...smartSortOptions, courierPrimary: false };
 
                 // First, add grouped SKUs in order
                 customGroups.forEach((group, groupIndex) => {
                     const groupPrefix = String(groupIndex + 1).padStart(3, '0');
 
-                    group.skus.forEach(skuKey => {
+                    const groupSkuKeys = sortSkuKeysByPreferences(group.skus, smartSortOptions);
+
+                    groupSkuKeys.forEach(skuKey => {
                         const data = detectedSkuData[skuKey];
 
                         if (!data) {
                             console.warn(`SKU key ${skuKey} found in group ${group.name}, but not detected in current PDF. Skipping.`);
                             return; // Skip this SKU
                         }
-                        // Sort pages within SKU
+                        // Sort pages within SKU (courier primary when courier-wise is on)
                         const sortedPages = [...data.pages].sort((a, b) => {
                             if (moveMultiQtyToEnd) {
                                 const aQty = getQuantitySortOrder(a.quantity);
                                 const bQty = getQuantitySortOrder(b.quantity);
                                 if (aQty !== bQty) return aQty - bQty;
                             }
-                            const aProv = getProviderSortOrder(a.shippingProvider);
-                            const bProv = getProviderSortOrder(b.shippingProvider);
-                            if (aProv !== bProv) return aProv - bProv;
-                            return a.pageIndex - b.pageIndex; // Fallback to page order
+                            return comparePagesWithSortOptions(a, b, groupedPageOptions);
                         });
                         sortedPages.forEach(page => {
                             pageData.push({
                                 pageIndex: page.pageIndex,
                                 sku: `${groupPrefix}-${skuKey}`,
+                                skuCode: page.skuCode || data.skuCode || '',
+                                size: page.size || data.size || '',
+                                color: page.color || data.color || '',
                                 shippingProvider: page.shippingProvider,
                                 quantity: page.quantity,
                                 rawTextLength: 0,
@@ -1458,37 +1847,33 @@
                     });
                 });
 
-                // Then add ungrouped SKUs at the end, sorted SKU-wise
+                // Then add ungrouped SKUs at the end (SKU rules + courier as secondary)
                 const allGroupedSkus = new Set(customGroups.flatMap(g => g.skus));
-                const ungroupedSkus = Object.keys(detectedSkuData)
-                    .filter(skuKey => !allGroupedSkus.has(skuKey))
-                    .sort((a, b) => {
-                        const rawA = detectedSkuData[a].rawSku || a;
-                        const rawB = detectedSkuData[b].rawSku || b;
-                        return rawA.localeCompare(rawB, undefined, { sensitivity: 'base' });
-                    });
+                const ungroupedSkus = sortSkuKeysByPreferences(
+                    Object.keys(detectedSkuData).filter(skuKey => !allGroupedSkus.has(skuKey)),
+                    smartSortOptions
+                );
                 ungroupedSkus.forEach(skuKey => {
                     const data = detectedSkuData[skuKey];
                     if (!data) {
                         console.warn(`Ungrouped SKU key ${skuKey} missing data. Skipping.`);
                         return;
                     }
-                    // Sort pages within SKU
                     const sortedPages = [...data.pages].sort((a, b) => {
                         if (moveMultiQtyToEnd) {
                             const aQty = getQuantitySortOrder(a.quantity);
                             const bQty = getQuantitySortOrder(b.quantity);
                             if (aQty !== bQty) return aQty - bQty;
                         }
-                        const aProv = getProviderSortOrder(a.shippingProvider);
-                        const bProv = getProviderSortOrder(b.shippingProvider);
-                        if (aProv !== bProv) return aProv - bProv;
-                        return a.pageIndex - b.pageIndex; // Fallback to page order
+                        return comparePagesWithSortOptions(a, b, ungroupedPageOptions);
                     });
                     sortedPages.forEach(page => {
                         pageData.push({
                             pageIndex: page.pageIndex,
                             sku: `999-${skuKey}`,
+                            skuCode: page.skuCode || data.skuCode || '',
+                            size: page.size || data.size || '',
+                            color: page.color || data.color || '',
                             shippingProvider: page.shippingProvider,
                             quantity: page.quantity,
                             rawTextLength: 0,
@@ -1501,10 +1886,8 @@
                     throw new Error("No SKUs were successfully mapped for grouping. Check your groups and uploaded file.");
                 }
 
-              // Sort by quantity group if enabled, then by group, then by provider, then by SKU
+              // Sort: multi-qty → group → within group courier/SKU rules
               pageData.sort((a, b) => {
-                    // 1. GLOBAL MULTI-QTY CHECK: This MUST be the very first check.
-                    // It ensures that regardless of groups or SKUs, multi-qty orders are pushed to the end.
                     if (moveMultiQtyToEnd) {
                         const aQtyGroup = getQuantitySortOrder(a.quantity);
                         const bQtyGroup = getQuantitySortOrder(b.quantity);
@@ -1513,48 +1896,26 @@
                         }
                     }
 
-                    // 2. Extract group prefix (first part before -)
                     const aParts = a.sku.split('-');
                     const bParts = b.sku.split('-');
                     const aGroup = aParts[0];
                     const bGroup = bParts[0];
-                    const aSku = aParts.slice(1).join('-');
-                    const bSku = bParts.slice(1).join('-');
 
-                    // 3. Check if both are ungrouped SKUs (999 prefix)
                     const aIsUngrouped = aGroup === '999';
                     const bIsUngrouped = bGroup === '999';
 
                     if (aIsUngrouped && bIsUngrouped) {
-                        // For ungrouped SKUs: sort by SKU first
-                        const skuCompare = aSku.localeCompare(bSku);
-                        if (skuCompare !== 0) {
-                            return skuCompare;
-                        }
-                        // Then by shipping provider within same SKU
-                        const aProviderOrder = getProviderSortOrder(a.shippingProvider);
-                        const bProviderOrder = getProviderSortOrder(b.shippingProvider);
-                        if (aProviderOrder !== bProviderOrder) {
-                            return aProviderOrder - bProviderOrder;
-                        }
-                        return a.pageIndex - b.pageIndex;
+                        // Ungrouped: SKU-wise (+ size/color if on), then courier if on
+                        return comparePagesWithSortOptions(a, b, ungroupedPageOptions);
                     }
 
-                    // 4. Then sort by group
                     const groupCompare = aGroup.localeCompare(bGroup);
                     if (groupCompare !== 0) {
                         return groupCompare;
                     }
 
-                    // 5. Then sort by shipping provider within the same group
-                    const aProviderOrder = getProviderSortOrder(a.shippingProvider);
-                    const bProviderOrder = getProviderSortOrder(b.shippingProvider);
-                    if (aProviderOrder !== bProviderOrder) {
-                        return aProviderOrder - bProviderOrder;
-                    }
-
-                    // 6. Finally sort by SKU within the same group and provider
-                    return aSku.localeCompare(bSku);
+                    // Custom group: courier-wise first (if on), then size/color/SKU
+                    return comparePagesWithSortOptions(a, b, groupedPageOptions);
                 });
                 // Create the PDF
                 const newPdfDoc = await PDFLib.PDFDocument.create();
@@ -1650,9 +2011,12 @@
         function renderCustomGroupSummary() {
             const skuListDiv = document.getElementById('sku-count-breakdown');
             skuListDiv.innerHTML = '<h3 class="text-lg font-semibold text-gray-700 mb-3">Custom Groups Summary</h3>';
+            // Summary list respects size/color checkboxes
+            const smartSortOptions = {};
 
             customGroups.forEach(group => {
-                const totalOrders = group.skus.reduce((sum, skuKey) => {
+                const sortedGroupSkus = sortSkuKeysByPreferences(group.skus, smartSortOptions);
+                const totalOrders = sortedGroupSkus.reduce((sum, skuKey) => {
                     const data = detectedSkuData[skuKey];
                     if (data) {
                         return sum + data.pages.length;
@@ -1661,7 +2025,7 @@
                 }, 0);
 
                 const groupRowColors = ['bg-slate-50', 'bg-emerald-50', 'bg-indigo-50'];
-                const skuDetails = group.skus.map((skuKey, index) => {
+                const skuDetails = sortedGroupSkus.map((skuKey, index) => {
                     const data = detectedSkuData[skuKey];
                     if (data) {
                         const rowBg = groupRowColors[index % groupRowColors.length];
@@ -1684,13 +2048,10 @@
             });
 
             const allGroupedSkus = new Set(customGroups.flatMap(g => g.skus));
-            const ungroupedSkus = Object.keys(detectedSkuData)
-                .filter(sku => !allGroupedSkus.has(sku))
-                .sort((a, b) => {
-                    const rawA = detectedSkuData[a].rawSku || a;
-                    const rawB = detectedSkuData[b].rawSku || b;
-                    return rawA.localeCompare(rawB, undefined, { sensitivity: 'base' });
-                });
+            const ungroupedSkus = sortSkuKeysByPreferences(
+                Object.keys(detectedSkuData).filter(sku => !allGroupedSkus.has(sku)),
+                smartSortOptions
+            );
 
             if (ungroupedSkus.length > 0) {
                 const rowColors = ['bg-slate-50', 'bg-emerald-50', 'bg-indigo-50'];
@@ -2014,8 +2375,9 @@
 
         window.onload = function () {
             resetUI();
-            // Load groups on initial page load
+            // Load groups and checkbox preferences on initial page load
             loadGroupsFromStorage();
+            loadSortPreferences();
             addDragDropHandlers();
         };
 
