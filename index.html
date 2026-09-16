@@ -1978,16 +1978,16 @@
 
             wrapper.innerHTML = `
                 <button type="button"
-                    class="group-summary-toggle w-full flex justify-between items-center p-4 text-left cursor-pointer hover:opacity-90 transition-opacity"
+                    class="group-summary-toggle w-full flex justify-between items-center px-4 py-4 text-left cursor-pointer hover:opacity-90 transition-opacity"
                     aria-expanded="false"
                     aria-controls="${detailsId}">
                     <div class="flex items-center gap-2 min-w-0">
                         <svg class="group-summary-chevron w-5 h-5 flex-shrink-0 transition-transform duration-200 ${titleClass}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                         </svg>
-                        <h4 class="text-lg font-bold ${titleClass} truncate">${title}</h4>
+                        <h4 class="text-lg font-bold leading-snug ${titleClass}">${title}</h4>
                     </div>
-                    <span class="text-xl font-bold ${countClass} flex-shrink-0 ml-2">${totalOrders} orders</span>
+                    <span class="text-xl font-bold leading-snug ${countClass} flex-shrink-0 ml-2">${totalOrders} orders</span>
                 </button>
                 <div id="${detailsId}" class="group-summary-details hidden px-4 pb-4 pt-1 border-t border-black/10">
                     ${detailsHtml}
@@ -2041,7 +2041,7 @@
                     title: group.name,
                     totalOrders,
                     detailsHtml: skuDetails || '<p class="text-sm text-gray-500 py-2">No SKUs in this group.</p>',
-                    cardClass: `mb-4 ${group.color.bg} ${group.color.border} border-2 rounded-lg overflow-hidden`,
+                    cardClass: `mb-4 ${group.color.bg} ${group.color.border} border-2 rounded-lg`,
                     titleClass: group.color.text,
                     countClass: group.color.text,
                 });
@@ -2072,7 +2072,7 @@
                     title: 'Ungrouped SKUs',
                     totalOrders: totalUngrouped,
                     detailsHtml: ungroupedDetails,
-                    cardClass: 'mb-4 bg-gray-100 border-2 border-gray-300 rounded-lg overflow-hidden',
+                    cardClass: 'mb-4 bg-gray-100 border-2 border-gray-300 rounded-lg',
                     titleClass: 'text-gray-700',
                     countClass: 'text-gray-600',
                 });
@@ -2158,11 +2158,91 @@
             return { drawLine, drawSectionTitle, drawRow };
         }
 
+        function guessGradientSolid(className) {
+            const cls = String(className || '');
+            if (/from-indigo|to-purple|from-violet/.test(cls)) {
+                return { backgroundColor: '#6366f1', color: '#ffffff' };
+            }
+            if (/from-emerald|to-teal|from-green/.test(cls)) {
+                return { backgroundColor: '#10b981', color: '#ffffff' };
+            }
+            if (/from-green-500|to-emerald/.test(cls)) {
+                return { backgroundColor: '#22c55e', color: '#ffffff' };
+            }
+            return { backgroundColor: '#6366f1', color: '#ffffff' };
+        }
+
+        function rgbToHex(rgb) {
+            if (!rgb || rgb === 'transparent' || rgb === 'rgba(0, 0, 0, 0)') return null;
+            const m = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+            if (!m) return rgb;
+            return '#' + [m[1], m[2], m[3]].map(v => {
+                const hex = Number(v).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        function bakeElementStylesForCapture(root) {
+            const nodes = [root, ...root.querySelectorAll('*')];
+            nodes.forEach(el => {
+                if (el.nodeType !== 1) return;
+                const cs = window.getComputedStyle(el);
+                const className = typeof el.className === 'string' ? el.className : '';
+
+                // Replace gradients with solid brand colors (keeps white text readable)
+                if (cs.backgroundImage && cs.backgroundImage !== 'none' && cs.backgroundImage.includes('gradient')) {
+                    const solid = guessGradientSolid(className);
+                    el.style.backgroundImage = 'none';
+                    el.style.background = solid.backgroundColor;
+                    el.style.backgroundColor = solid.backgroundColor;
+                    if (/text-white|opacity-90|opacity-80/.test(className) || solid.color) {
+                        el.style.color = solid.color;
+                    }
+                    el.querySelectorAll('p, span, div, h1, h2, h3, h4').forEach(child => {
+                        const childCls = typeof child.className === 'string' ? child.className : '';
+                        if (/text-white|opacity-/.test(childCls) || !childCls.includes('text-')) {
+                            child.style.color = solid.color;
+                            child.style.opacity = '1';
+                        }
+                    });
+                } else {
+                    const bg = rgbToHex(cs.backgroundColor);
+                    if (bg) {
+                        el.style.backgroundColor = bg;
+                    }
+                }
+
+                // Bake text color to RGB (avoids oklch/lab issues in html2canvas)
+                const color = rgbToHex(cs.color);
+                if (color) {
+                    el.style.color = color;
+                }
+
+                // Flatten opacity utilities that wash out text
+                if (cs.opacity && cs.opacity !== '1') {
+                    el.style.opacity = '1';
+                }
+
+                // More reliable font rendering in canvas
+                el.style.fontFamily = 'Arial, Helvetica, sans-serif';
+                if (cs.fontSize) el.style.fontSize = cs.fontSize;
+                if (cs.fontWeight) el.style.fontWeight = cs.fontWeight;
+                if (cs.lineHeight && cs.lineHeight !== 'normal') el.style.lineHeight = cs.lineHeight;
+
+                // Borders
+                if (cs.borderTopWidth && cs.borderTopWidth !== '0px') {
+                    el.style.borderColor = rgbToHex(cs.borderColor) || cs.borderColor;
+                }
+            });
+        }
+
         async function buildSummaryPdfBytes() {
-            const pdfDoc = await PDFLib.PDFDocument.create();
-            const regularFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-            const boldFont = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
-            const { drawLine, drawSectionTitle, drawRow } = createSummaryPdfBuilder(pdfDoc, regularFont, boldFont);
+            const exportContainer = document.getElementById('summary-pdf-export');
+            const resultArea = document.getElementById('result-area');
+
+            if (!resultArea || resultArea.classList.contains('hidden')) {
+                throw new Error('No summary available. Process a PDF first.');
+            }
 
             const dateLabel = new Date().toLocaleDateString('en-GB', {
                 day: '2-digit',
@@ -2170,81 +2250,163 @@
                 year: 'numeric'
             });
 
-            drawLine('Meesho Label Summary', { size: 18, bold: true });
-            drawLine(`Date: ${dateLabel}`, { size: 11 });
-            drawLine(`Mode: ${summaryBreakdownMode === 'custom-groups' ? 'Custom Groups' : 'SKU Breakdown'}`, { size: 11 });
+            exportContainer.innerHTML = `
+                <div class="mb-6 pb-4 border-b border-gray-300">
+                    <h2 class="text-2xl font-bold text-gray-800">Meesho Label Summary</h2>
+                    <p class="text-gray-500">Date: ${dateLabel}</p>
+                </div>
+                ${resultArea.innerHTML}
+            `;
 
-            const summaryText = document.getElementById('summary-output')?.textContent?.trim();
-            if (summaryText) {
-                drawLine(summaryText, { size: 10 });
-            }
+            // Remove action buttons from the export clone
+            exportContainer.querySelectorAll(
+                '#download-button, #download-summary-button, #share-summary-button'
+            ).forEach(el => el.remove());
 
-            // Accounts
-            const sortedAccounts = Object.entries(accountNameCounts)
-                .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0].localeCompare(b[0])));
-            if (sortedAccounts.length > 0) {
-                drawSectionTitle('Orders by Meesho Account');
-                sortedAccounts.forEach(([name, count]) => drawRow(name, count));
-            }
+            // Expand all collapsible groups so the PDF shows full UI content
+            exportContainer.querySelectorAll('.group-summary-details').forEach(el => {
+                el.classList.remove('hidden');
+                el.style.display = 'block';
+            });
+            exportContainer.querySelectorAll('.group-summary-chevron').forEach(el => el.remove());
+            exportContainer.querySelectorAll('.group-summary-toggle').forEach(el => {
+                el.setAttribute('aria-expanded', 'true');
+                el.style.cursor = 'default';
+                el.style.overflow = 'visible';
+                el.style.minHeight = '56px';
+                el.style.alignItems = 'center';
+                el.style.paddingTop = '18px';
+                el.style.paddingBottom = '18px';
+            });
+            exportContainer.querySelectorAll('.group-summary-toggle h4, .group-summary-toggle span').forEach(el => {
+                el.style.lineHeight = '1.4';
+                el.style.overflow = 'visible';
+                el.style.textOverflow = 'clip';
+                el.style.whiteSpace = 'normal';
+                el.style.paddingBottom = '2px';
+            });
+            // overflow-hidden on cards clips bold title descenders in html2canvas
+            exportContainer.querySelectorAll('#sku-count-breakdown > div').forEach(el => {
+                el.style.overflow = 'visible';
+            });
 
-            // Providers
-            const sortedProviders = Object.entries(providerNameCounts)
-                .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0].localeCompare(b[0])));
-            if (sortedProviders.length > 0) {
-                drawSectionTitle('Shipping Provider Breakdown');
-                sortedProviders.forEach(([name, count]) => drawRow(name, count));
-            }
+            // Place on-screen with real dimensions for accurate layout
+            exportContainer.className = 'fixed top-0 left-0 w-[760px] bg-[#f7f7f9] p-6';
+            exportContainer.style.cssText = 'position:fixed;left:0;top:0;width:760px;z-index:-1;opacity:1;pointer-events:none;background:#f7f7f9;';
 
-            // SKU / custom groups
-            if (summaryBreakdownMode === 'custom-groups' && customGroups.length > 0) {
-                drawSectionTitle('Custom Groups Summary');
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await new Promise(resolve => setTimeout(resolve, 200));
 
-                customGroups.forEach(group => {
-                    const sortedGroupSkus = sortSkuKeysByPreferences(group.skus, {});
-                    const totalOrders = sortedGroupSkus.reduce((sum, skuKey) => {
-                        const data = detectedSkuData[skuKey];
-                        return sum + (data ? data.pages.length : 0);
-                    }, 0);
+            // Convert Tailwind/oklch/gradients into solid RGB inline styles before capture
+            bakeElementStylesForCapture(exportContainer);
 
-                    drawLine(`${group.name}  (${totalOrders} orders)`, { size: 12, bold: true });
-                    sortedGroupSkus.forEach(skuKey => {
-                        const data = detectedSkuData[skuKey];
-                        if (data) {
-                            drawRow(data.rawSku || skuKey, data.pages.length, 12);
-                        }
-                    });
+            // Re-apply title spacing after bake (bake can tighten line-height)
+            exportContainer.querySelectorAll('.group-summary-toggle').forEach(el => {
+                el.style.overflow = 'visible';
+                el.style.minHeight = '56px';
+                el.style.paddingTop = '18px';
+                el.style.paddingBottom = '18px';
+            });
+            exportContainer.querySelectorAll('.group-summary-toggle h4, .group-summary-toggle span').forEach(el => {
+                el.style.lineHeight = '1.45';
+                el.style.overflow = 'visible';
+                el.style.paddingBottom = '3px';
+            });
+            exportContainer.querySelectorAll('#sku-count-breakdown > div').forEach(el => {
+                el.style.overflow = 'visible';
+            });
+
+            try {
+                const canvas = await html2canvas(exportContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#f7f7f9',
+                    width: 760,
+                    windowWidth: 760,
+                    scrollX: 0,
+                    scrollY: 0,
+                    foreignObjectRendering: false,
+                    letterRendering: true,
+                    logging: false,
+                    onclone: (clonedDoc) => {
+                        const cloned = clonedDoc.getElementById('summary-pdf-export');
+                        if (!cloned) return;
+
+                        cloned.style.position = 'fixed';
+                        cloned.style.left = '0px';
+                        cloned.style.top = '0px';
+                        cloned.style.width = '760px';
+                        cloned.style.opacity = '1';
+                        cloned.style.zIndex = '1';
+                        cloned.style.background = '#f7f7f9';
+                        cloned.style.fontFamily = 'Arial, Helvetica, sans-serif';
+
+                        cloned.querySelectorAll('.group-summary-details').forEach(el => {
+                            el.classList.remove('hidden');
+                            el.style.display = 'block';
+                        });
+
+                        cloned.querySelectorAll('.group-summary-toggle').forEach(el => {
+                            el.style.overflow = 'visible';
+                            el.style.minHeight = '56px';
+                            el.style.paddingTop = '18px';
+                            el.style.paddingBottom = '18px';
+                        });
+                        cloned.querySelectorAll('.group-summary-toggle h4, .group-summary-toggle span').forEach(el => {
+                            el.style.lineHeight = '1.4';
+                            el.style.overflow = 'visible';
+                            el.style.paddingBottom = '2px';
+                        });
+                        cloned.querySelectorAll('#sku-count-breakdown > div').forEach(el => {
+                            el.style.overflow = 'visible';
+                        });
+
+                        // Ensure any remaining gradients are solid in the clone too
+                        cloned.querySelectorAll('*').forEach(el => {
+                            const style = clonedDoc.defaultView.getComputedStyle(el);
+                            if (style.backgroundImage && style.backgroundImage.includes('gradient')) {
+                                const solid = guessGradientSolid(el.className);
+                                el.style.backgroundImage = 'none';
+                                el.style.backgroundColor = solid.backgroundColor;
+                                el.style.color = solid.color;
+                            }
+                        });
+                    }
                 });
 
-                const allGroupedSkus = new Set(customGroups.flatMap(g => g.skus));
-                const ungroupedSkus = sortSkuKeysByPreferences(
-                    Object.keys(detectedSkuData).filter(sku => !allGroupedSkus.has(sku)),
-                    {}
-                );
-                if (ungroupedSkus.length > 0) {
-                    const totalUngrouped = ungroupedSkus.reduce(
-                        (sum, skuKey) => sum + detectedSkuData[skuKey].pages.length,
-                        0
-                    );
-                    drawLine(`Ungrouped SKUs  (${totalUngrouped} orders)`, { size: 12, bold: true });
-                    ungroupedSkus.forEach(skuKey => {
-                        const data = detectedSkuData[skuKey];
-                        drawRow(data.rawSku || skuKey, data.pages.length, 12);
-                    });
+                if (!canvas || canvas.width < 10 || canvas.height < 10) {
+                    throw new Error('Failed to capture summary UI (empty canvas).');
                 }
-            } else {
-                const sortedSkus = Object.entries(uniqueSkuCounts)
-                    .map(([key, value]) => ({ key, ...value }))
-                    .sort((a, b) => compareBySkuThenSize(a, b));
 
-                if (sortedSkus.length > 0) {
-                    drawSectionTitle('SKU Label Breakdown');
-                    sortedSkus.forEach(data => {
-                        drawRow(data.rawSku || data.key, data.count);
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const imgData = canvas.toDataURL('image/png');
+                const pngImage = await pdfDoc.embedPng(imgData);
+
+                const PAGE_WIDTH = 595.28;
+                const PAGE_HEIGHT = 841.89;
+                const scaledWidth = PAGE_WIDTH;
+                const scaledHeight = (pngImage.height * PAGE_WIDTH) / pngImage.width;
+
+                let offsetY = 0;
+                while (offsetY < scaledHeight) {
+                    const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+                    page.drawImage(pngImage, {
+                        x: 0,
+                        y: PAGE_HEIGHT - scaledHeight + offsetY,
+                        width: scaledWidth,
+                        height: scaledHeight,
                     });
+                    offsetY += PAGE_HEIGHT;
                 }
+
+                return await pdfDoc.save();
+            } finally {
+                exportContainer.innerHTML = '';
+                exportContainer.className = 'fixed -left-[9999px] top-0 w-[760px] bg-[#f7f7f9] p-6';
+                exportContainer.style.cssText = '';
+                exportContainer.setAttribute('aria-hidden', 'true');
             }
-
-            return await pdfDoc.save();
         }
         async function shareSummaryPdf() {
             try {
@@ -2290,7 +2452,7 @@
                 showNotification('Summary PDF downloaded.', 'success');
             } catch (error) {
                 console.error('Download summary PDF failed:', error);
-                showNotification('Unable to create summary PDF. Please try again.', 'error');
+                showNotification(`Unable to create summary PDF: ${error.message}`, 'error');
             }
         }
 
