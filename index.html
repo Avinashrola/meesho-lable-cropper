@@ -2159,83 +2159,92 @@
         }
 
         async function buildSummaryPdfBytes() {
-            const exportContainer = document.getElementById('summary-pdf-export');
-            const resultArea = document.getElementById('result-area');
+            const pdfDoc = await PDFLib.PDFDocument.create();
+            const regularFont = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+            const boldFont = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+            const { drawLine, drawSectionTitle, drawRow } = createSummaryPdfBuilder(pdfDoc, regularFont, boldFont);
 
-            // 1. Clone the UI into the hidden container
-            exportContainer.innerHTML = `
-        <div class="mb-6 pb-4 border-b border-gray-300">
-            <h2 class="text-2xl font-bold text-gray-800">Meesho Label Summary</h2>
-            <p class="text-gray-500">Date: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-        </div>
-        ${resultArea.innerHTML}
-    `;
-
-            // 2. Remove the specific action buttons so they don't appear in the PDF
-            const downloadBtn = exportContainer.querySelector('#download-button');
-            const shareBtn = exportContainer.querySelector('#share-summary-button');
-            if (downloadBtn) downloadBtn.remove();
-            if (shareBtn) shareBtn.remove();
-
-            // 3. Selectively expand ONLY the "Ungrouped SKUs" section
-            const groupToggles = exportContainer.querySelectorAll('.group-summary-toggle');
-            groupToggles.forEach(toggle => {
-                const titleElement = toggle.querySelector('h4');
-                const detailsElement = toggle.nextElementSibling; // This grabs the .group-summary-details div
-
-                if (titleElement && titleElement.textContent.trim() === 'Ungrouped SKUs') {
-                    // Expand only the ungrouped items
-                    if (detailsElement) {
-                        detailsElement.classList.remove('hidden');
-                    }
-                }
-
-                // Remove the chevron icon for all items so it looks like a static report, not a broken button
-                const chevron = toggle.querySelector('.group-summary-chevron');
-                if (chevron) chevron.remove();
+            const dateLabel = new Date().toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
             });
 
-            // Make sure the export container is temporarily visible to html2canvas
-            exportContainer.style.left = '0';
-            exportContainer.style.zIndex = '-100';
+            drawLine('Meesho Label Summary', { size: 18, bold: true });
+            drawLine(`Date: ${dateLabel}`, { size: 11 });
+            drawLine(`Mode: ${summaryBreakdownMode === 'custom-groups' ? 'Custom Groups' : 'SKU Breakdown'}`, { size: 11 });
 
-            try {
-                // 4. Generate a high-quality canvas
-                const canvas = await html2canvas(exportContainer, {
-                    scale: 2,
-                    useCORS: true,
-                    backgroundColor: '#f7f7f9',
-                    windowWidth: 760
-                });
-
-                // 5. Create a new PDF and embed the captured image
-                const pdfDoc = await PDFLib.PDFDocument.create();
-                const imgData = canvas.toDataURL('image/png');
-                const pngImage = await pdfDoc.embedPng(imgData);
-
-                // 6. Scale the image to fit a standard width
-                const PAGE_WIDTH = 595.28;
-                const imgDims = pngImage.scale(1);
-                const scaleFactor = PAGE_WIDTH / imgDims.width;
-                const scaledHeight = imgDims.height * scaleFactor;
-
-                const page = pdfDoc.addPage([PAGE_WIDTH, scaledHeight]);
-
-                page.drawImage(pngImage, {
-                    x: 0,
-                    y: 0,
-                    width: PAGE_WIDTH,
-                    height: scaledHeight,
-                });
-
-                return await pdfDoc.save();
-
-            } finally {
-                // 7. Always reset the export container back to its hidden state
-                exportContainer.innerHTML = '';
-                exportContainer.style.left = '-9999px';
-                exportContainer.style.zIndex = 'auto';
+            const summaryText = document.getElementById('summary-output')?.textContent?.trim();
+            if (summaryText) {
+                drawLine(summaryText, { size: 10 });
             }
+
+            // Accounts
+            const sortedAccounts = Object.entries(accountNameCounts)
+                .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0].localeCompare(b[0])));
+            if (sortedAccounts.length > 0) {
+                drawSectionTitle('Orders by Meesho Account');
+                sortedAccounts.forEach(([name, count]) => drawRow(name, count));
+            }
+
+            // Providers
+            const sortedProviders = Object.entries(providerNameCounts)
+                .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0].localeCompare(b[0])));
+            if (sortedProviders.length > 0) {
+                drawSectionTitle('Shipping Provider Breakdown');
+                sortedProviders.forEach(([name, count]) => drawRow(name, count));
+            }
+
+            // SKU / custom groups
+            if (summaryBreakdownMode === 'custom-groups' && customGroups.length > 0) {
+                drawSectionTitle('Custom Groups Summary');
+
+                customGroups.forEach(group => {
+                    const sortedGroupSkus = sortSkuKeysByPreferences(group.skus, {});
+                    const totalOrders = sortedGroupSkus.reduce((sum, skuKey) => {
+                        const data = detectedSkuData[skuKey];
+                        return sum + (data ? data.pages.length : 0);
+                    }, 0);
+
+                    drawLine(`${group.name}  (${totalOrders} orders)`, { size: 12, bold: true });
+                    sortedGroupSkus.forEach(skuKey => {
+                        const data = detectedSkuData[skuKey];
+                        if (data) {
+                            drawRow(data.rawSku || skuKey, data.pages.length, 12);
+                        }
+                    });
+                });
+
+                const allGroupedSkus = new Set(customGroups.flatMap(g => g.skus));
+                const ungroupedSkus = sortSkuKeysByPreferences(
+                    Object.keys(detectedSkuData).filter(sku => !allGroupedSkus.has(sku)),
+                    {}
+                );
+                if (ungroupedSkus.length > 0) {
+                    const totalUngrouped = ungroupedSkus.reduce(
+                        (sum, skuKey) => sum + detectedSkuData[skuKey].pages.length,
+                        0
+                    );
+                    drawLine(`Ungrouped SKUs  (${totalUngrouped} orders)`, { size: 12, bold: true });
+                    ungroupedSkus.forEach(skuKey => {
+                        const data = detectedSkuData[skuKey];
+                        drawRow(data.rawSku || skuKey, data.pages.length, 12);
+                    });
+                }
+            } else {
+                const sortedSkus = Object.entries(uniqueSkuCounts)
+                    .map(([key, value]) => ({ key, ...value }))
+                    .sort((a, b) => compareBySkuThenSize(a, b));
+
+                if (sortedSkus.length > 0) {
+                    drawSectionTitle('SKU Label Breakdown');
+                    sortedSkus.forEach(data => {
+                        drawRow(data.rawSku || data.key, data.count);
+                    });
+                }
+            }
+
+            return await pdfDoc.save();
         }
         async function shareSummaryPdf() {
             try {
