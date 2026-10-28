@@ -39,16 +39,17 @@
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="./branding/assets.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.js';
     </script>
 </head>
 
-<body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
+<body class="p-3 sm:p-5 min-h-screen flex items-start justify-center">
 
     <div id="summary-pdf-export" class="fixed -left-[9999px] top-0 w-[760px] bg-[#f7f7f9] p-6" aria-hidden="true"></div>
 
-    <div id="app" class="w-full max-w-4xl container-card p-6 sm:p-10 rounded-xl">
+    <div id="app" class="w-full max-w-4xl container-card p-5 sm:p-8 rounded-xl transition-all duration-300 my-3 sm:my-5">
         <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
             <svg class="w-8 h-8 mr-3 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"
                 xmlns="http://www.w3.org/2000/svg">
@@ -164,12 +165,21 @@
                         </label>
                         <span class="text-sm text-gray-500">Off by default — keeps full original pages</span>
                     </div>
+                    <div class="mt-3 flex items-center gap-3 p-4 bg-sky-50 border border-sky-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="buyer-tips-toggle" type="checkbox" checked
+                                onchange="addBuyerTipsOnLabel = this.checked; saveSortPreferences()"
+                                class="h-4 w-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500" />
+                            <span class="text-sm text-slate-900">Add seller branding on label</span>
+                        </label>
+                        <span class="text-sm text-gray-500">Thank-you card in empty space (buyer impression)</span>
+                    </div>
                     <p class="text-sm text-gray-500 mt-3">Pick a method to sort your labels before exporting.</p>
                 </div>
             </div>
 
             <div id="result-area" class="hidden mt-6">
-                <div class="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-between">
+                <div class="bg-green-100 text-green-800 p-4 rounded-lg flex flex-wrap items-center justify-between gap-3">
                     <span class="font-medium" id="success-message">Processing Complete!</span>
                     <button id="download-button" onclick="downloadPdf()"
                         class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
@@ -177,51 +187,70 @@
                     </button>
                 </div>
 
-                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h3 class="font-semibold text-gray-700 mb-2">Summary:</h3>
-                    <p class="text-sm text-gray-600" id="summary-output"></p>
-                </div>
+                <div class="mt-6 grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+                    <!-- Left: summary & breakdowns (wider) -->
+                    <div id="result-details-column" class="min-w-0 lg:col-span-3">
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-semibold text-gray-700 mb-2">Summary:</h3>
+                            <p class="text-sm text-gray-600" id="summary-output"></p>
+                        </div>
 
-                <!-- NEW: Account Name Breakdown -->
-                <div class="mt-8 pt-4 border-t border-gray-300">
-                    <h3 class="text-xl font-bold text-gray-700 mb-4">
-                        Orders by Meesho Account 👤
-                    </h3>
-                    <div id="account-count-breakdown" class="space-y-3">
-                        <!-- Account counts will be injected here -->
+                        <div class="mt-6 pt-4 border-t border-gray-300">
+                            <h3 class="text-xl font-bold text-gray-700 mb-4">
+                                Orders by Meesho Account 👤
+                            </h3>
+                            <div id="account-count-breakdown" class="space-y-3">
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-gray-300">
+                            <h3 class="text-xl font-bold text-gray-700 mb-4">
+                                Shipping Provider Breakdown 🚚
+                            </h3>
+                            <div id="provider-count-breakdown" class="space-y-3">
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-gray-300">
+                            <h3 class="text-xl font-bold text-gray-700 mb-4">
+                                SKU Label Breakdown 📦
+                            </h3>
+                            <div id="sku-count-breakdown" class="space-y-3">
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-6 border-t border-gray-300 flex flex-wrap justify-end gap-3">
+                            <button id="download-summary-button" onclick="downloadSummaryPdf()"
+                                class="bg-white border border-gray-300 text-slate-800 font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-slate-50 transition duration-200">
+                                Download Summary PDF
+                            </button>
+                            <button id="share-summary-button" onclick="shareSummaryPdf()"
+                                class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
+                                Share Summary PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right: scrollable multi-page PDF preview (narrower) -->
+                    <div id="pdf-preview-column" class="min-w-0 lg:col-span-2 lg:sticky lg:top-4">
+                        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[80vh]">
+                            <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-shrink-0">
+                                <h3 class="font-semibold text-gray-800">Sorted PDF Preview</h3>
+                                <span id="pdf-preview-page-label" class="text-xs text-gray-500">Loading...</span>
+                            </div>
+                            <div id="pdf-preview-scroll" class="p-3 bg-slate-100 overflow-y-auto flex-1 min-h-0">
+                                <div id="pdf-preview-pages" class="space-y-3"></div>
+                                <p id="pdf-preview-empty" class="hidden text-sm text-gray-500 text-center py-10">No PDF preview available.</p>
+                            </div>
+                            <div class="px-4 py-3 border-t border-slate-200 flex justify-center bg-white flex-shrink-0">
+                                <button type="button" onclick="downloadPdf()"
+                                    class="px-4 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 font-semibold">
+                                    Download Sorted PDF
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                <div class="mt-8 pt-4 border-t border-gray-300">
-                    <h3 class="text-xl font-bold text-gray-700 mb-4">
-                        Shipping Provider Breakdown 🚚
-                    </h3>
-                    <div id="provider-count-breakdown" class="space-y-3">
-                        <!-- Provider counts will be injected here -->
-                    </div>
-                </div>
-
-                <!-- SKU Count Breakdown -->
-                <div class="mt-8 pt-4 border-t border-gray-300">
-                    <h3 class="text-xl font-bold text-gray-700 mb-4">
-                        SKU Label Breakdown 📦
-                    </h3>
-                    <div id="sku-count-breakdown" class="space-y-3">
-                        <!-- SKU list and counts will be injected here -->
-                    </div>
-                </div>
-
-                <div class="mt-8 pt-6 border-t border-gray-300 flex flex-wrap justify-end gap-3">
-                    <button id="download-summary-button" onclick="downloadSummaryPdf()"
-                        class="bg-white border border-gray-300 text-slate-800 font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-slate-50 transition duration-200">
-                        Download Summary PDF
-                    </button>
-                    <button id="share-summary-button" onclick="shareSummaryPdf()"
-                        class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
-                        Share Summary PDF
-                    </button>
-                </div>
-
             </div>
 
             <div id="error-area" class="hidden mt-6 bg-red-100 text-red-800 p-4 rounded-lg shadow-inner">
@@ -367,6 +396,7 @@
         let moveMultiQtyToEnd = true;
         let cropTaxInvoice = true;
         let sortOnlyNoCrop = false;
+        let addBuyerTipsOnLabel = true;
         let sortBySize = true;
         let sortByColor = true;
         let sortByCourier = false;
@@ -459,6 +489,14 @@
             document.getElementById('grouping-section').classList.add('hidden');
             document.getElementById('success-message').textContent = message;
             document.getElementById('summary-output').textContent = summary;
+
+            const app = document.getElementById('app');
+            if (app) {
+                app.classList.remove('max-w-4xl');
+                app.classList.add('max-w-[96vw]');
+            }
+
+            renderSortedPdfPreview();
         }
 
         function saveSortPreferences() {
@@ -467,6 +505,7 @@
                     moveMultiQtyToEnd,
                     cropTaxInvoice,
                     sortOnlyNoCrop,
+                    addBuyerTipsOnLabel,
                     sortBySize,
                     sortByColor,
                     sortByCourier
@@ -503,6 +542,9 @@
                 if (typeof prefs.sortOnlyNoCrop === 'boolean') {
                     sortOnlyNoCrop = prefs.sortOnlyNoCrop;
                 }
+                if (typeof prefs.addBuyerTipsOnLabel === 'boolean') {
+                    addBuyerTipsOnLabel = prefs.addBuyerTipsOnLabel;
+                }
                 if (typeof prefs.sortBySize === 'boolean') {
                     sortBySize = prefs.sortBySize;
                 }
@@ -524,6 +566,10 @@
                 const sortOnlyToggle = document.getElementById('sort-only-toggle');
                 if (sortOnlyToggle) {
                     sortOnlyToggle.checked = sortOnlyNoCrop;
+                }
+                const buyerTipsToggle = document.getElementById('buyer-tips-toggle');
+                if (buyerTipsToggle) {
+                    buyerTipsToggle.checked = addBuyerTipsOnLabel;
                 }
                 syncSortOnlyUi();
                 return true;
@@ -579,6 +625,10 @@
             if (sortOnlyToggle) {
                 sortOnlyToggle.checked = sortOnlyNoCrop;
             }
+            const buyerTipsToggle = document.getElementById('buyer-tips-toggle');
+            if (buyerTipsToggle) {
+                buyerTipsToggle.checked = addBuyerTipsOnLabel;
+            }
             syncSortOptionToggles();
             syncSortOnlyUi();
             document.getElementById('sort-options-area').classList.remove('hidden');
@@ -624,6 +674,12 @@
             document.getElementById('sort-options-area').classList.add('hidden');
             document.getElementById('pdfFile').value = '';
             document.getElementById('sku-count-breakdown').innerHTML = '';
+            const app = document.getElementById('app');
+            if (app) {
+                app.classList.add('max-w-4xl');
+                app.classList.remove('max-w-[96vw]');
+            }
+            pdfPreviewDoc = null;
             sortedPdfBytes = null;
             uniqueSkuCounts = {};
             detectedSkuData = {};
@@ -1339,6 +1395,7 @@
                         size: skuInfo.size,
                         color: skuInfo.color,
                         skuCode: skuInfo.skuCode,
+                        accountName: accountName,
                         cropY: cropY
                     });
                 }
@@ -1391,16 +1448,174 @@
             return quantity >= 2 ? 2 : 1; // 1 for qty < 2, 2 for qty >= 2
         }
 
+        function dataUrlToUint8Array(dataUrl) {
+            const base64 = String(dataUrl || '').split(',')[1] || '';
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        async function getBuyerPanelFonts(pdfDoc) {
+            if (!pdfDoc._buyerPanelFonts) {
+                pdfDoc._buyerPanelFonts = {
+                    regular: await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica),
+                    bold: await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold),
+                };
+            }
+            return pdfDoc._buyerPanelFonts;
+        }
+
+        async function getBrandingImages(pdfDoc) {
+            if (pdfDoc._brandingImages) {
+                return pdfDoc._brandingImages;
+            }
+            const assets = window.BRANDING_ASSETS || {};
+            const images = { thankYou: null, packedCare: null };
+            try {
+                if (assets.thankYou) {
+                    images.thankYou = await pdfDoc.embedJpg(dataUrlToUint8Array(assets.thankYou));
+                }
+            } catch (e) {
+                console.warn('Failed to embed thank-you banner:', e);
+            }
+            try {
+                if (assets.packedCare) {
+                    images.packedCare = await pdfDoc.embedJpg(dataUrlToUint8Array(assets.packedCare));
+                }
+            } catch (e) {
+                console.warn('Failed to embed packed-care stamp:', e);
+            }
+            pdfDoc._brandingImages = images;
+            return images;
+        }
+
+        /**
+         * Graphic branding in empty label space:
+         * thank-you on the left, packed-with-care on the right (no seller name clutter).
+         */
+        async function drawBuyerExperiencePanel(page, pdfDoc, { fonts, freeBottomHeight = null } = {}) {
+            if (!fonts?.regular || !fonts?.bold) {
+                return false;
+            }
+
+            const { width, height } = page.getSize();
+            const sideMargin = 22;
+            const bottomMargin = 16;
+            const topClearance = 40;
+            const mutedInk = PDFLib.rgb(0.4, 0.35, 0.45);
+
+            const emptyTop = freeBottomHeight != null ? freeBottomHeight : height * 0.42;
+            const maxBlockTop = emptyTop - topClearance;
+            const desiredHeight = 120;
+            const blockTop = Math.min(bottomMargin + desiredHeight, maxBlockTop);
+            const blockHeight = blockTop - bottomMargin;
+
+            if (blockHeight < 85 || maxBlockTop <= bottomMargin + 80) {
+                return false;
+            }
+
+            const images = await getBrandingImages(pdfDoc);
+            const contentWidth = width - sideMargin * 2;
+            const gap = 14;
+            const colWidth = (contentWidth - gap) / 2;
+            const artHeight = Math.max(50, blockHeight - 22);
+
+            // Soft backdrop
+            page.drawRectangle({
+                x: sideMargin - 2,
+                y: bottomMargin - 2,
+                width: contentWidth + 4,
+                height: blockHeight + 4,
+                borderColor: PDFLib.rgb(0.88, 0.86, 0.9),
+                borderWidth: 0.7,
+                color: PDFLib.rgb(1, 1, 1),
+            });
+
+            // Left: thank-you graphic
+            if (images.thankYou) {
+                const dims = images.thankYou.scale(1);
+                const scale = Math.min(colWidth / dims.width, artHeight / dims.height);
+                const w = dims.width * scale;
+                const h = dims.height * scale;
+                page.drawImage(images.thankYou, {
+                    x: sideMargin + (colWidth - w) / 2,
+                    y: bottomMargin + 16 + (artHeight - h) / 2,
+                    width: w,
+                    height: h,
+                });
+            } else {
+                const font = fonts.bold;
+                const text = 'Thank you for your order';
+                const size = 10;
+                const tw = font.widthOfTextAtSize(text, size);
+                page.drawText(text, {
+                    x: sideMargin + (colWidth - tw) / 2,
+                    y: bottomMargin + 16 + artHeight / 2,
+                    size,
+                    font,
+                    color: PDFLib.rgb(0.3, 0.15, 0.45),
+                });
+            }
+
+            // Right: packed-with-care graphic
+            if (images.packedCare) {
+                const dims = images.packedCare.scale(1);
+                const scale = Math.min(colWidth / dims.width, artHeight / dims.height);
+                const w = dims.width * scale;
+                const h = dims.height * scale;
+                page.drawImage(images.packedCare, {
+                    x: sideMargin + colWidth + gap + (colWidth - w) / 2,
+                    y: bottomMargin + 16 + (artHeight - h) / 2,
+                    width: w,
+                    height: h,
+                });
+            } else {
+                const font = fonts.bold;
+                const text = 'PACKED WITH CARE';
+                const size = 9;
+                const tw = font.widthOfTextAtSize(text, size);
+                page.drawText(text, {
+                    x: sideMargin + colWidth + gap + (colWidth - tw) / 2,
+                    y: bottomMargin + 16 + artHeight / 2,
+                    size,
+                    font,
+                    color: PDFLib.rgb(0.2, 0.2, 0.22),
+                });
+            }
+
+            // Soft rating line centered under both graphics
+            const rating = 'If you loved it, a Meesho rating means a lot to us.';
+            const ratingSize = 7.5;
+            const ratingW = fonts.regular.widthOfTextAtSize(rating, ratingSize);
+            page.drawText(rating, {
+                x: Math.max(sideMargin, (width - ratingW) / 2),
+                y: bottomMargin + 4,
+                size: ratingSize,
+                font: fonts.regular,
+                color: mutedInk,
+            });
+
+            return true;
+        }
+
         async function appendSortedLabelPage(newPdfDoc, pageInfo) {
             const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
             if (!originalPage) {
                 return;
             }
 
-            // Sort-only mode: keep full original page size, no cropping/resizing
+            const fonts = addBuyerTipsOnLabel ? await getBuyerPanelFonts(newPdfDoc) : null;
+
+            // Sort-only mode: keep full original page size, then draw buyer panel in empty bottom
             if (sortOnlyNoCrop) {
                 const [copiedPage] = await newPdfDoc.copyPages(pdfDocumentData.pdfLibDoc, [pageInfo.pageIndex]);
                 newPdfDoc.addPage(copiedPage);
+                if (addBuyerTipsOnLabel) {
+                    await drawBuyerExperiencePanel(copiedPage, newPdfDoc, { fonts });
+                }
                 return;
             }
 
@@ -1417,7 +1632,8 @@
             }
 
             const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
-            const yOffset = croppedPage.getHeight() - embeddedHeight;
+            const pageHeight = croppedPage.getHeight();
+            const yOffset = pageHeight - embeddedHeight;
 
             croppedPage.drawPage(embeddedPage, {
                 x: 0,
@@ -1425,6 +1641,91 @@
                 width: embeddedWidth,
                 height: embeddedHeight,
             });
+
+            // Draw branding only when leftover bottom space can fit graphics + clearance
+            if (addBuyerTipsOnLabel && yOffset >= 120) {
+                await drawBuyerExperiencePanel(croppedPage, newPdfDoc, {
+                    fonts,
+                    freeBottomHeight: yOffset,
+                });
+            }
+        }
+
+        let pdfPreviewDoc = null;
+
+        async function renderSortedPdfPreview() {
+            const pagesHost = document.getElementById('pdf-preview-pages');
+            const empty = document.getElementById('pdf-preview-empty');
+            const label = document.getElementById('pdf-preview-page-label');
+            if (!pagesHost) return;
+
+            pagesHost.innerHTML = '';
+
+            if (!sortedPdfBytes) {
+                if (empty) empty.classList.remove('hidden');
+                if (label) label.textContent = 'No PDF';
+                return;
+            }
+
+            try {
+                if (empty) empty.classList.add('hidden');
+                if (label) label.textContent = 'Loading preview...';
+
+                const data = sortedPdfBytes instanceof Uint8Array
+                    ? sortedPdfBytes.slice(0)
+                    : new Uint8Array(sortedPdfBytes);
+
+                pdfPreviewDoc = await pdfjsLib.getDocument({ data }).promise;
+                const scrollHost = document.getElementById('pdf-preview-scroll');
+                const containerWidth = (scrollHost?.clientWidth || 320) - 16;
+                // Render sharper on Retina / HiDPI displays (fixes blurry preview)
+                const pixelRatio = Math.min(window.devicePixelRatio || 1, 2.5);
+
+                for (let pageNum = 1; pageNum <= pdfPreviewDoc.numPages; pageNum++) {
+                    const page = await pdfPreviewDoc.getPage(pageNum);
+                    const unscaled = page.getViewport({ scale: 1 });
+                    const cssScale = Math.max(Math.min(containerWidth / unscaled.width, 1.25), 0.45);
+                    const viewport = page.getViewport({ scale: cssScale * pixelRatio });
+                    const cssWidth = Math.floor(unscaled.width * cssScale);
+                    const cssHeight = Math.floor(unscaled.height * cssScale);
+
+                    const wrap = document.createElement('div');
+                    wrap.className = 'bg-white rounded border border-slate-200 shadow-sm overflow-hidden';
+
+                    const pageTag = document.createElement('div');
+                    pageTag.className = 'text-[10px] text-slate-500 px-2 py-1 bg-slate-50 border-b border-slate-100';
+                    pageTag.textContent = `Page ${pageNum}`;
+                    wrap.appendChild(pageTag);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.className = 'block mx-auto';
+                    // HiDPI backing store + CSS display size keeps preview sharp on Retina screens
+                    canvas.width = Math.floor(viewport.width);
+                    canvas.height = Math.floor(viewport.height);
+                    canvas.style.width = `${cssWidth}px`;
+                    canvas.style.height = `${cssHeight}px`;
+                    canvas.style.maxWidth = '100%';
+                    wrap.appendChild(canvas);
+                    pagesHost.appendChild(wrap);
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                }
+
+                if (label) {
+                    label.textContent = `${pdfPreviewDoc.numPages} page${pdfPreviewDoc.numPages === 1 ? '' : 's'} — scroll to view`;
+                }
+            } catch (error) {
+                console.error('PDF preview failed:', error);
+                pagesHost.innerHTML = '';
+                if (empty) {
+                    empty.textContent = 'Preview unavailable. You can still download the PDF.';
+                    empty.classList.remove('hidden');
+                }
+                if (label) label.textContent = 'Preview error';
+            }
         }
 
         async function finalizePdfWithSorting(pageData, pagesRemoved, originalNumPages, sortMode = 'sku') {
@@ -1883,6 +2184,7 @@
                                 skuCode: page.skuCode || data.skuCode || '',
                                 size: page.size || data.size || '',
                                 color: page.color || data.color || '',
+                                accountName: page.accountName || '',
                                 shippingProvider: page.shippingProvider,
                                 quantity: page.quantity,
                                 rawTextLength: 0,
@@ -1919,6 +2221,7 @@
                             skuCode: page.skuCode || data.skuCode || '',
                             size: page.size || data.size || '',
                             color: page.color || data.color || '',
+                            accountName: page.accountName || '',
                             shippingProvider: page.shippingProvider,
                             quantity: page.quantity,
                             rawTextLength: 0,
@@ -2276,10 +2579,23 @@
                 ${resultArea.innerHTML}
             `;
 
-            // Remove action buttons from the export clone
+            // Summary PDF is stats-only — drop sorted PDF preview and action buttons
             exportContainer.querySelectorAll(
-                '#download-button, #download-summary-button, #share-summary-button'
+                '#pdf-preview-column, #download-button, #download-summary-button, #share-summary-button'
             ).forEach(el => el.remove());
+            exportContainer.querySelectorAll('button').forEach(el => el.remove());
+            // Left column was 3/5 in a grid; make it full width for the export
+            exportContainer.querySelectorAll('#result-details-column').forEach(el => {
+                el.className = 'min-w-0';
+            });
+            exportContainer.querySelectorAll('.grid').forEach(el => {
+                el.className = el.className
+                    .replace(/\bgrid-cols-\S+/g, '')
+                    .replace(/\blg:grid-cols-\S+/g, '')
+                    .replace(/\bgap-\S+/g, '')
+                    .trim();
+                el.classList.add('block');
+            });
 
             // Expand all collapsible groups so the PDF shows full UI content
             exportContainer.querySelectorAll('.group-summary-details').forEach(el => {
