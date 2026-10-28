@@ -155,6 +155,15 @@
                         </label>
                         <span class="text-sm text-gray-500">Enabled by default</span>
                     </div>
+                    <div class="mt-3 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="sort-only-toggle" type="checkbox"
+                                onchange="sortOnlyNoCrop = this.checked; saveSortPreferences(); syncSortOnlyUi()"
+                                class="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+                            <span class="text-sm text-slate-900">Sort only (do not crop labels)</span>
+                        </label>
+                        <span class="text-sm text-gray-500">Off by default — keeps full original pages</span>
+                    </div>
                     <p class="text-sm text-gray-500 mt-3">Pick a method to sort your labels before exporting.</p>
                 </div>
             </div>
@@ -357,6 +366,7 @@
         let originalPageCount = 0;
         let moveMultiQtyToEnd = true;
         let cropTaxInvoice = true;
+        let sortOnlyNoCrop = false;
         let sortBySize = true;
         let sortByColor = true;
         let sortByCourier = false;
@@ -456,6 +466,7 @@
                 const prefs = {
                     moveMultiQtyToEnd,
                     cropTaxInvoice,
+                    sortOnlyNoCrop,
                     sortBySize,
                     sortByColor,
                     sortByCourier
@@ -466,11 +477,20 @@
             }
         }
 
+        function syncSortOnlyUi() {
+            const taxToggle = document.getElementById('crop-tax-toggle');
+            if (taxToggle) {
+                taxToggle.disabled = sortOnlyNoCrop;
+                taxToggle.parentElement?.classList.toggle('opacity-50', sortOnlyNoCrop);
+            }
+        }
+
         function loadSortPreferences() {
             try {
                 const saved = localStorage.getItem(STORAGE_KEYS.SORT_PREFS);
                 if (!saved) {
                     syncSortOptionToggles();
+                    syncSortOnlyUi();
                     return false;
                 }
                 const prefs = JSON.parse(saved);
@@ -479,6 +499,9 @@
                 }
                 if (typeof prefs.cropTaxInvoice === 'boolean') {
                     cropTaxInvoice = prefs.cropTaxInvoice;
+                }
+                if (typeof prefs.sortOnlyNoCrop === 'boolean') {
+                    sortOnlyNoCrop = prefs.sortOnlyNoCrop;
                 }
                 if (typeof prefs.sortBySize === 'boolean') {
                     sortBySize = prefs.sortBySize;
@@ -498,6 +521,11 @@
                 if (taxToggle) {
                     taxToggle.checked = cropTaxInvoice;
                 }
+                const sortOnlyToggle = document.getElementById('sort-only-toggle');
+                if (sortOnlyToggle) {
+                    sortOnlyToggle.checked = sortOnlyNoCrop;
+                }
+                syncSortOnlyUi();
                 return true;
             } catch (error) {
                 console.error('Failed to load sort preferences:', error);
@@ -547,7 +575,12 @@
             if (taxToggle) {
                 taxToggle.checked = cropTaxInvoice;
             }
+            const sortOnlyToggle = document.getElementById('sort-only-toggle');
+            if (sortOnlyToggle) {
+                sortOnlyToggle.checked = sortOnlyNoCrop;
+            }
             syncSortOptionToggles();
+            syncSortOnlyUi();
             document.getElementById('sort-options-area').classList.remove('hidden');
         }
 
@@ -1257,7 +1290,7 @@
 
                     // Get text coordinates to find TAX INVOICE position
                     let cropY = null;
-                    if (cropTaxInvoice) {
+                    if (cropTaxInvoice && !sortOnlyNoCrop) {
                         const textItems = await getTextCoordinatesFromPage(pdfjsDoc, pageNumber);
                         const pageObj = await pdfjsDoc.getPage(pageNumber);
                         const pageHeight = pageObj.view[3];
@@ -1358,6 +1391,42 @@
             return quantity >= 2 ? 2 : 1; // 1 for qty < 2, 2 for qty >= 2
         }
 
+        async function appendSortedLabelPage(newPdfDoc, pageInfo) {
+            const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
+            if (!originalPage) {
+                return;
+            }
+
+            // Sort-only mode: keep full original page size, no cropping/resizing
+            if (sortOnlyNoCrop) {
+                const [copiedPage] = await newPdfDoc.copyPages(pdfDocumentData.pdfLibDoc, [pageInfo.pageIndex]);
+                newPdfDoc.addPage(copiedPage);
+                return;
+            }
+
+            const embeddedPage = await newPdfDoc.embedPage(originalPage);
+            let embeddedWidth = Number(embeddedPage.width);
+            let embeddedHeight = Number(embeddedPage.height);
+
+            if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
+                return;
+            }
+
+            if (cropTaxInvoice && pageInfo.cropY !== null && pageInfo.cropY !== undefined) {
+                embeddedHeight = pageInfo.cropY;
+            }
+
+            const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
+            const yOffset = croppedPage.getHeight() - embeddedHeight;
+
+            croppedPage.drawPage(embeddedPage, {
+                x: 0,
+                y: yOffset,
+                width: embeddedWidth,
+                height: embeddedHeight,
+            });
+        }
+
         async function finalizePdfWithSorting(pageData, pagesRemoved, originalNumPages, sortMode = 'sku') {
             try {
                 updateStatus('Sorting and creating PDF...');
@@ -1399,40 +1468,13 @@
                 const newPdfDoc = await PDFLib.PDFDocument.create();
 
                 for (const pageInfo of sortedPageData) {
-                    const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
-
-                    if (!originalPage) {
-                        continue;
-                    }
-
-                    const embeddedPage = await newPdfDoc.embedPage(originalPage);
-                    let embeddedWidth = Number(embeddedPage.width);
-                    let embeddedHeight = Number(embeddedPage.height);
-
-                    if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
-                        continue;
-                    }
-
-                    // Crop TAX INVOICE section if enabled and crop position found
-                    if (cropTaxInvoice && pageInfo.cropY !== null && pageInfo.cropY !== undefined) {
-                        embeddedHeight = pageInfo.cropY;
-                    }
-
-                    const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
-                    const yOffset = croppedPage.getHeight() - embeddedHeight;
-
-                    croppedPage.drawPage(embeddedPage, {
-                        x: 0,
-                        y: yOffset,
-                        width: embeddedWidth,
-                        height: embeddedHeight,
-                    });
+                    await appendSortedLabelPage(newPdfDoc, pageInfo);
                 }
 
                 updateStatus('Finalizing document...');
                 sortedPdfBytes = await newPdfDoc.save();
 
-                const summary = `Original Pages: ${originalNumPages} | Pages Kept: ${sortedPageData.length} | Pages Removed: ${pagesRemoved}`;
+                const summary = `Original Pages: ${originalNumPages} | Pages Kept: ${sortedPageData.length} | Pages Removed: ${pagesRemoved}${sortOnlyNoCrop ? ' | Sort only (no crop)' : ''}`;
                 let modeLabel = 'Shipping Provider';
                 if (sortMode !== 'provider') {
                     const extras = [];
@@ -1441,7 +1483,10 @@
                     if (sortByCourier) extras.push('Courier');
                     modeLabel = extras.length ? `SKU + ${extras.join(' + ')}` : 'SKU';
                 }
-                showResult(`${modeLabel} Sorting and Cropping Complete!`, summary);
+                if (sortOnlyNoCrop) {
+                    modeLabel += ' (Sort Only)';
+                }
+                showResult(`${modeLabel} Sorting${sortOnlyNoCrop ? '' : ' and Cropping'} Complete!`, summary);
                 renderAccountCounts(); // Render account breakdown
                 renderProviderCounts(); // Render provider breakdown
                 renderSkuCounts();
@@ -1921,34 +1966,7 @@
                 const newPdfDoc = await PDFLib.PDFDocument.create();
 
                 for (const pageInfo of pageData) {
-                    const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
-
-                    if (!originalPage) {
-                        continue;
-                    }
-
-                    const embeddedPage = await newPdfDoc.embedPage(originalPage);
-                    let embeddedWidth = Number(embeddedPage.width);
-                    let embeddedHeight = Number(embeddedPage.height);
-
-                    if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
-                        continue;
-                    }
-
-                    // Crop TAX INVOICE section if enabled and crop position found
-                    if (cropTaxInvoice && pageInfo.cropY !== null && pageInfo.cropY !== undefined) {
-                        embeddedHeight = pageInfo.cropY;
-                    }
-
-                    const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
-                    const yOffset = croppedPage.getHeight() - embeddedHeight;
-
-                    croppedPage.drawPage(embeddedPage, {
-                        x: 0,
-                        y: yOffset,
-                        width: embeddedWidth,
-                        height: embeddedHeight,
-                    });
+                    await appendSortedLabelPage(newPdfDoc, pageInfo);
                 }
 
                 updateStatus('Finalizing document...');
@@ -1956,9 +1974,9 @@
 
                 const groupedCount = customGroups.reduce((sum, g) => sum + g.skus.length, 0);
                 const ungroupedCount = Object.keys(detectedSkuData).length - groupedCount;
-                const summary = `Custom Groups: ${customGroups.length} | Grouped SKUs: ${groupedCount} | Ungrouped SKUs: ${ungroupedCount} | Total Pages: ${pageData.length}`;
+                const summary = `Custom Groups: ${customGroups.length} | Grouped SKUs: ${groupedCount} | Ungrouped SKUs: ${ungroupedCount} | Total Pages: ${pageData.length}${sortOnlyNoCrop ? ' | Sort only (no crop)' : ''}`;
 
-                showResult('Custom Grouping Applied Successfully!', summary);
+                showResult(sortOnlyNoCrop ? 'Custom Grouping Applied (Sort Only)!' : 'Custom Grouping Applied Successfully!', summary);
                 renderAccountCounts(); // Render account breakdown for custom grouping too
                 renderProviderCounts();
                 renderCustomGroupSummary();
