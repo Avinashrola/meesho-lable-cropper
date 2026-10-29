@@ -39,16 +39,17 @@
     <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="./branding/assets.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.js';
     </script>
 </head>
 
-<body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
+<body class="p-3 sm:p-5 min-h-screen flex items-start justify-center">
 
     <div id="summary-pdf-export" class="fixed -left-[9999px] top-0 w-[760px] bg-[#f7f7f9] p-6" aria-hidden="true"></div>
 
-    <div id="app" class="w-full max-w-4xl container-card p-6 sm:p-10 rounded-xl">
+    <div id="app" class="w-full max-w-4xl container-card p-5 sm:p-8 rounded-xl transition-all duration-300 my-3 sm:my-5">
         <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center">
             <svg class="w-8 h-8 mr-3 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"
                 xmlns="http://www.w3.org/2000/svg">
@@ -155,12 +156,30 @@
                         </label>
                         <span class="text-sm text-gray-500">Enabled by default</span>
                     </div>
+                    <div class="mt-3 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="sort-only-toggle" type="checkbox"
+                                onchange="sortOnlyNoCrop = this.checked; saveSortPreferences(); syncSortOnlyUi()"
+                                class="h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+                            <span class="text-sm text-slate-900">Sort only (do not crop labels)</span>
+                        </label>
+                        <span class="text-sm text-gray-500">Off by default — keeps full original pages</span>
+                    </div>
+                    <div class="mt-3 flex items-center gap-3 p-4 bg-sky-50 border border-sky-200 rounded-lg">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input id="buyer-tips-toggle" type="checkbox" checked
+                                onchange="addBuyerTipsOnLabel = this.checked; saveSortPreferences()"
+                                class="h-4 w-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500" />
+                            <span class="text-sm text-slate-900">Add seller branding on label</span>
+                        </label>
+                        <span class="text-sm text-gray-500">Thank-you card in empty space (buyer impression)</span>
+                    </div>
                     <p class="text-sm text-gray-500 mt-3">Pick a method to sort your labels before exporting.</p>
                 </div>
             </div>
 
             <div id="result-area" class="hidden mt-6">
-                <div class="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-between">
+                <div class="bg-green-100 text-green-800 p-4 rounded-lg flex flex-wrap items-center justify-between gap-3">
                     <span class="font-medium" id="success-message">Processing Complete!</span>
                     <button id="download-button" onclick="downloadPdf()"
                         class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
@@ -168,51 +187,70 @@
                     </button>
                 </div>
 
-                <div class="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h3 class="font-semibold text-gray-700 mb-2">Summary:</h3>
-                    <p class="text-sm text-gray-600" id="summary-output"></p>
-                </div>
+                <div class="mt-6 grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+                    <!-- Left: summary & breakdowns (wider) -->
+                    <div id="result-details-column" class="min-w-0 lg:col-span-3">
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <h3 class="font-semibold text-gray-700 mb-2">Summary:</h3>
+                            <p class="text-sm text-gray-600" id="summary-output"></p>
+                        </div>
 
-                <!-- NEW: Account Name Breakdown -->
-                <div class="mt-8 pt-4 border-t border-gray-300">
-                    <h3 class="text-xl font-bold text-gray-700 mb-4">
-                        Orders by Meesho Account 👤
-                    </h3>
-                    <div id="account-count-breakdown" class="space-y-3">
-                        <!-- Account counts will be injected here -->
+                        <div class="mt-6 pt-4 border-t border-gray-300">
+                            <h3 class="text-xl font-bold text-gray-700 mb-4">
+                                Orders by Meesho Account 👤
+                            </h3>
+                            <div id="account-count-breakdown" class="space-y-3">
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-gray-300">
+                            <h3 class="text-xl font-bold text-gray-700 mb-4">
+                                Shipping Provider Breakdown 🚚
+                            </h3>
+                            <div id="provider-count-breakdown" class="space-y-3">
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-gray-300">
+                            <h3 class="text-xl font-bold text-gray-700 mb-4">
+                                SKU Label Breakdown 📦
+                            </h3>
+                            <div id="sku-count-breakdown" class="space-y-3">
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-6 border-t border-gray-300 flex flex-wrap justify-end gap-3">
+                            <button id="download-summary-button" onclick="downloadSummaryPdf()"
+                                class="bg-white border border-gray-300 text-slate-800 font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-slate-50 transition duration-200">
+                                Download Summary PDF
+                            </button>
+                            <button id="share-summary-button" onclick="shareSummaryPdf()"
+                                class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
+                                Share Summary PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right: scrollable multi-page PDF preview (narrower) -->
+                    <div id="pdf-preview-column" class="min-w-0 lg:col-span-2 lg:sticky lg:top-4">
+                        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col max-h-[80vh]">
+                            <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-shrink-0">
+                                <h3 class="font-semibold text-gray-800">PDF Preview</h3>
+                                <span id="pdf-preview-page-label" class="text-xs text-gray-500">Loading...</span>
+                            </div>
+                            <div id="pdf-preview-scroll" class="p-3 bg-slate-100 overflow-y-auto flex-1 min-h-0">
+                                <div id="pdf-preview-pages" class="space-y-3"></div>
+                                <p id="pdf-preview-empty" class="hidden text-sm text-gray-500 text-center py-10">No PDF preview available.</p>
+                            </div>
+                            <div class="px-4 py-3 border-t border-slate-200 flex justify-center bg-white flex-shrink-0">
+                                <button type="button" onclick="downloadPdf()"
+                                    class="px-4 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 font-semibold">
+                                    Download Sorted PDF
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                <div class="mt-8 pt-4 border-t border-gray-300">
-                    <h3 class="text-xl font-bold text-gray-700 mb-4">
-                        Shipping Provider Breakdown 🚚
-                    </h3>
-                    <div id="provider-count-breakdown" class="space-y-3">
-                        <!-- Provider counts will be injected here -->
-                    </div>
-                </div>
-
-                <!-- SKU Count Breakdown -->
-                <div class="mt-8 pt-4 border-t border-gray-300">
-                    <h3 class="text-xl font-bold text-gray-700 mb-4">
-                        SKU Label Breakdown 📦
-                    </h3>
-                    <div id="sku-count-breakdown" class="space-y-3">
-                        <!-- SKU list and counts will be injected here -->
-                    </div>
-                </div>
-
-                <div class="mt-8 pt-6 border-t border-gray-300 flex flex-wrap justify-end gap-3">
-                    <button id="download-summary-button" onclick="downloadSummaryPdf()"
-                        class="bg-white border border-gray-300 text-slate-800 font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-slate-50 transition duration-200">
-                        Download Summary PDF
-                    </button>
-                    <button id="share-summary-button" onclick="shareSummaryPdf()"
-                        class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200">
-                        Share Summary PDF
-                    </button>
-                </div>
-
             </div>
 
             <div id="error-area" class="hidden mt-6 bg-red-100 text-red-800 p-4 rounded-lg shadow-inner">
@@ -357,6 +395,8 @@
         let originalPageCount = 0;
         let moveMultiQtyToEnd = true;
         let cropTaxInvoice = true;
+        let sortOnlyNoCrop = false;
+        let addBuyerTipsOnLabel = true;
         let sortBySize = true;
         let sortByColor = true;
         let sortByCourier = false;
@@ -449,6 +489,14 @@
             document.getElementById('grouping-section').classList.add('hidden');
             document.getElementById('success-message').textContent = message;
             document.getElementById('summary-output').textContent = summary;
+
+            const app = document.getElementById('app');
+            if (app) {
+                app.classList.remove('max-w-4xl');
+                app.classList.add('max-w-[96vw]');
+            }
+
+            renderSortedPdfPreview();
         }
 
         function saveSortPreferences() {
@@ -456,6 +504,8 @@
                 const prefs = {
                     moveMultiQtyToEnd,
                     cropTaxInvoice,
+                    sortOnlyNoCrop,
+                    addBuyerTipsOnLabel,
                     sortBySize,
                     sortByColor,
                     sortByCourier
@@ -466,11 +516,20 @@
             }
         }
 
+        function syncSortOnlyUi() {
+            const taxToggle = document.getElementById('crop-tax-toggle');
+            if (taxToggle) {
+                taxToggle.disabled = sortOnlyNoCrop;
+                taxToggle.parentElement?.classList.toggle('opacity-50', sortOnlyNoCrop);
+            }
+        }
+
         function loadSortPreferences() {
             try {
                 const saved = localStorage.getItem(STORAGE_KEYS.SORT_PREFS);
                 if (!saved) {
                     syncSortOptionToggles();
+                    syncSortOnlyUi();
                     return false;
                 }
                 const prefs = JSON.parse(saved);
@@ -479,6 +538,12 @@
                 }
                 if (typeof prefs.cropTaxInvoice === 'boolean') {
                     cropTaxInvoice = prefs.cropTaxInvoice;
+                }
+                if (typeof prefs.sortOnlyNoCrop === 'boolean') {
+                    sortOnlyNoCrop = prefs.sortOnlyNoCrop;
+                }
+                if (typeof prefs.addBuyerTipsOnLabel === 'boolean') {
+                    addBuyerTipsOnLabel = prefs.addBuyerTipsOnLabel;
                 }
                 if (typeof prefs.sortBySize === 'boolean') {
                     sortBySize = prefs.sortBySize;
@@ -498,6 +563,15 @@
                 if (taxToggle) {
                     taxToggle.checked = cropTaxInvoice;
                 }
+                const sortOnlyToggle = document.getElementById('sort-only-toggle');
+                if (sortOnlyToggle) {
+                    sortOnlyToggle.checked = sortOnlyNoCrop;
+                }
+                const buyerTipsToggle = document.getElementById('buyer-tips-toggle');
+                if (buyerTipsToggle) {
+                    buyerTipsToggle.checked = addBuyerTipsOnLabel;
+                }
+                syncSortOnlyUi();
                 return true;
             } catch (error) {
                 console.error('Failed to load sort preferences:', error);
@@ -515,6 +589,10 @@
             }
             syncSortOptionToggles();
             saveSortPreferences();
+            // Refresh group summary labels when size/color visibility changes
+            if (summaryBreakdownMode === 'custom-groups' && customGroups.length > 0) {
+                renderCustomGroupSummary();
+            }
         }
 
         function syncSortOptionToggles() {
@@ -547,7 +625,16 @@
             if (taxToggle) {
                 taxToggle.checked = cropTaxInvoice;
             }
+            const sortOnlyToggle = document.getElementById('sort-only-toggle');
+            if (sortOnlyToggle) {
+                sortOnlyToggle.checked = sortOnlyNoCrop;
+            }
+            const buyerTipsToggle = document.getElementById('buyer-tips-toggle');
+            if (buyerTipsToggle) {
+                buyerTipsToggle.checked = addBuyerTipsOnLabel;
+            }
             syncSortOptionToggles();
+            syncSortOnlyUi();
             document.getElementById('sort-options-area').classList.remove('hidden');
         }
 
@@ -591,6 +678,12 @@
             document.getElementById('sort-options-area').classList.add('hidden');
             document.getElementById('pdfFile').value = '';
             document.getElementById('sku-count-breakdown').innerHTML = '';
+            const app = document.getElementById('app');
+            if (app) {
+                app.classList.add('max-w-4xl');
+                app.classList.remove('max-w-[96vw]');
+            }
+            pdfPreviewDoc = null;
             sortedPdfBytes = null;
             uniqueSkuCounts = {};
             detectedSkuData = {};
@@ -648,13 +741,37 @@
             return 200;
         }
 
+        /**
+         * PDF.js often splits underscore SKUs into spaced tokens ("hair serum_1").
+         * Rebuild codes like hair_serum_1; leave readable names ("hair serum - 2 pcs") alone.
+         */
+        function normalizeExtractedSkuCode(skuCode) {
+            let s = String(skuCode || '').replace(/\s+/g, ' ').trim();
+            if (!s) return '';
+            s = s.replace(/\s*_\s*/g, '_');
+            // Keep human product names that use dashes / "pcs"
+            if (/\s[-–]\s|\bpcs\b/i.test(s)) {
+                return s;
+            }
+            // Collapse spaced code-like tokens: "hair serum_1" / "hair serum 2" → underscored
+            if (/\s/.test(s) && /^[A-Za-z0-9_]+(?:\s+[A-Za-z0-9_]+)+$/.test(s)) {
+                s = s.replace(/\s+/g, '_');
+            }
+            return s;
+        }
+
         function parseProductRow(rawText) {
             const empty = { skuCode: '', size: '', qty: '', color: '', descriptiveSku: '' };
 
-            const skuRowPattern = /SKU\s*Size\s*Qty\s*Color\s*Order No\.\s*(\S+)\s+(Free\s*Size|\S+)\s+(\d+)\s+(.+?)\s+(\d{10,}_\d+)(?=\s*TAX INVOICE|\s|$)/i;
+            // Capture FULL sku (may contain spaces from PDF text) up to a real size token
+            const sizeToken = String.raw`Free\s*Size|XXXL|XXL|2XL|3XL|4XL|5XL|6XL|XS|S|M|L|XL|\d{2,3}`;
+            const skuRowPattern = new RegExp(
+                String.raw`SKU\s*Size\s*Qty\s*Color\s*Order No\.\s*(.+?)\s+(${sizeToken})\s+(\d+)\s+(.+?)\s+(\d{10,}_\d+)(?=\s*TAX INVOICE|\s|$)`,
+                'i'
+            );
             const skuRowMatch = rawText.match(skuRowPattern);
             if (skuRowMatch) {
-                const skuCode = skuRowMatch[1].trim();
+                const skuCode = normalizeExtractedSkuCode(skuRowMatch[1]);
                 const size = skuRowMatch[2].replace(/\s+/g, ' ').trim();
                 const qty = skuRowMatch[3].trim();
                 const color = skuRowMatch[4].trim();
@@ -670,8 +787,26 @@
             const fallbackSkuPattern = /SKU\s*Size\s*Qty\s*Color\s*Order No\.\s*([^\r\n]+?)(?=\s*(?:\d{10,}_\d+|TAX INVOICE))/i;
             const fallbackMatch = rawText.match(fallbackSkuPattern);
             if (fallbackMatch && fallbackMatch[1]) {
-                const parts = fallbackMatch[1].replace(/\s+/g, ' ').trim().split(' ');
-                const skuCode = parts[0] || '';
+                const row = fallbackMatch[1].replace(/\s+/g, ' ').trim();
+                const sizeSplit = row.match(
+                    new RegExp(String.raw`^(.+?)\s+(${sizeToken})\s+(\d+)\s+(.+)$`, 'i')
+                );
+                if (sizeSplit) {
+                    const skuCode = normalizeExtractedSkuCode(sizeSplit[1]);
+                    const size = sizeSplit[2].replace(/\s+/g, ' ').trim();
+                    const qty = sizeSplit[3].trim();
+                    const color = sizeSplit[4].trim();
+                    return {
+                        skuCode,
+                        size,
+                        qty,
+                        color,
+                        descriptiveSku: `${skuCode} ${size} ${qty} ${color}`.trim()
+                    };
+                }
+
+                const parts = row.split(' ');
+                const skuCode = normalizeExtractedSkuCode(parts[0] || '');
                 let size = '';
                 let qty = '';
                 let color = '';
@@ -689,7 +824,7 @@
                     size,
                     qty,
                     color,
-                    descriptiveSku: fallbackMatch[1].replace(/\s+/g, ' ').trim()
+                    descriptiveSku: `${skuCode} ${size} ${qty} ${color}`.replace(/\s+/g, ' ').trim()
                 };
             }
 
@@ -797,8 +932,53 @@
             };
         }
 
+        /**
+         * Label text for UI/export.
+         * Uses the real SKU code (e.g. hair_serum_1), and only appends size/color
+         * when those sort options are enabled — never strip tokens from rawSku
+         * (that mangled names like "hair_serum_1 Free Size…" into "hair Free").
+         */
+        function formatSkuDisplayLabel(data) {
+            const skuCode = String(data?.skuCode || '').trim();
+            const size = String(data?.size || '').trim();
+            const color = String(data?.color || '').trim();
+            const raw = String(data?.rawSku || '').replace(/\s+/g, ' ').trim();
+
+            // Prefer structured SKU code; fall back to first token of raw / full raw
+            let base = skuCode;
+            if (!base && raw) {
+                const freeTail = raw.match(/^(.*?)\s+Free\s*Size(?:\s+\d+)?(?:\s+.*)?$/i);
+                base = (freeTail ? freeTail[1] : raw.split(/\s+/)[0] || raw).trim();
+            }
+            if (!base) return raw;
+
+            const parts = [base];
+            if (sortBySize && size) parts.push(size);
+            if (sortByColor && color) parts.push(color);
+
+            // Both enabled → keep the familiar full descriptive line when available
+            if (sortBySize && sortByColor && raw) {
+                return raw;
+            }
+            return parts.join(' ');
+        }
+
         function sortSkuKeysByPreferences(skuKeys, options = {}) {
             return [...skuKeys].sort((a, b) => compareDetectedSkuKeys(a, b, options));
+        }
+
+        function cleanAccountName(name) {
+            let parts = String(name || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+            // Drop address leftovers from the next line (A-501, B-12, 501, plot numbers)
+            while (parts.length && /(?:\d|[A-Za-z]-?\d)/.test(parts[parts.length - 1])) {
+                parts.pop();
+            }
+            return parts.join(' ').trim();
+        }
+
+        function isValidAccountName(name) {
+            const accountName = cleanAccountName(name);
+            return accountName.length > 2 && accountName.length < 60 && !/\d/.test(accountName);
         }
 
         /**
@@ -807,50 +987,27 @@
          * @returns {string} The extracted account name or 'Unknown Account'.
          */
         function extractAccountName(rawText) {
-            // Primary Pattern: Look for "If undelivered, return to:" followed by the account name
-            const returnToPattern = /If undelivered,?\s*return to\s*:?\s*([A-Za-z0-9\s\.\-&]+?)(?:\r|\s\s)/i;
+            // Single-space join (used for SKU underscore fix) no longer creates the
+            // accidental "\s\s" the old regex required — match without needing double spaces.
+            const text = String(rawText || '').replace(/\s+/g, ' ').trim();
 
-            let match = rawText.match(returnToPattern);
-            console.log(match);
+            // Stop before flat/unit tokens (A-501), digits, comma, PIN, contact fields.
+            // Account names are letter words only (e.g. DASH HUB) — no digits in the capture.
+            const stopAhead = String.raw`(?=\s*(?:[A-Za-z]-?\d|\d|,|PIN\b|Phone|Mobile|Email|GSTIN|Address))`;
+            const nameWords = String.raw`([A-Za-z][A-Za-z.&]*(?:\s+[A-Za-z][A-Za-z.&]*){0,4})`;
 
-            if (match && match[1]) {
-                const accountName = match[1].trim();
-                // Validate: reasonable length and not just numbers
-                if (accountName.length > 2 && accountName.length < 60 && !/^\d+$/.test(accountName)) {
-                    return accountName;
-                }
-            }
+            const patterns = [
+                new RegExp(String.raw`If undelivered,?\s*return\s*to\s*:?\s*${nameWords}${stopAhead}`, 'i'),
+                new RegExp(String.raw`Return\s*Address\s*:?\s*${nameWords}${stopAhead}`, 'i'),
+                /(?:Sold by|Seller)\s*:?\s*([A-Za-z][A-Za-z\s.&]{1,50}?)(?=\s*(?:Email|Phone|Address|HSN|TAX|GSTIN|Contact|Mobile|\d))/i,
+                /(?:Supplier|Vendor)\s*:?\s*([A-Za-z][A-Za-z\s.&]{1,50}?)(?=\s*(?:Email|Phone|Address|HSN|TAX|GSTIN|\d))/i,
+                /(?:From)\s*:?\s*([A-Za-z][A-Za-z\s.&]{1,50}?)(?=\s*(?:\d|,|Email|Phone|Address|Contact))/i
+            ];
 
-            // Fallback Pattern 1: Look for "Sold by:" or "Seller:" followed by the name
-            const soldByPattern = /(?:Sold by|Seller)\s*:?\s*([A-Za-z0-9\s\.\-&]+?)(?:\s*(?:Email|Phone|Address|HSN|TAX|GSTIN|Contact|Mobile))/i;
-            match = rawText.match(soldByPattern);
-
-            if (match && match[1]) {
-                const accountName = match[1].trim();
-                if (accountName.length > 2 && accountName.length < 60 && !/^\d+$/.test(accountName)) {
-                    return accountName;
-                }
-            }
-
-            // Fallback Pattern 2: Look for account name near "Supplier" or "Vendor"
-            const supplierPattern = /(?:Supplier|Vendor)\s*:?\s*([A-Za-z0-9\s\.\-&]+?)(?:\s*(?:Email|Phone|Address|HSN|TAX|GSTIN))/i;
-            match = rawText.match(supplierPattern);
-
-            if (match && match[1]) {
-                const accountName = match[1].trim();
-                if (accountName.length > 2 && accountName.length < 60 && !/^\d+$/.test(accountName)) {
-                    return accountName;
-                }
-            }
-
-            // Fallback Pattern 3: Extract from "From" section
-            const fromPattern = /(?:From)\s*:?\s*([A-Za-z0-9\s\.\-&]+?)(?:\s*(?:\d|,|Email|Phone|Address|Contact))/i;
-            match = rawText.match(fromPattern);
-
-            if (match && match[1]) {
-                const accountName = match[1].trim();
-                if (accountName.length > 2 && accountName.length < 60 && !/^\d+$/.test(accountName)) {
-                    return accountName;
+            for (const pattern of patterns) {
+                const match = text.match(pattern);
+                if (match && match[1] && isValidAccountName(match[1])) {
+                    return cleanAccountName(match[1]);
                 }
             }
 
@@ -1010,7 +1167,32 @@
         async function getTextFromPdfPage(pdfDocument, pageNumber) {
             const page = await pdfDocument.getPage(pageNumber);
             const textContent = await page.getTextContent();
-            return textContent.items.map(item => item.str).join(' ');
+            // Position-aware join: avoid inserting spaces inside SKUs like hair_serum_1
+            // when PDF.js splits them into adjacent text runs.
+            let text = '';
+            let lastEndX = null;
+            let lastY = null;
+            for (const item of textContent.items) {
+                const str = item.str || '';
+                if (!str) continue;
+                const tx = item.transform ? item.transform[4] : 0;
+                const ty = item.transform ? item.transform[5] : 0;
+                const width = typeof item.width === 'number' ? item.width : 0;
+                if (text) {
+                    const sameLine = lastY != null && Math.abs(ty - lastY) < 2.5;
+                    const gap = lastEndX != null ? tx - lastEndX : 99;
+                    const underscoreBoundary = /_$/.test(text) || /^_/.test(str);
+                    if (!sameLine) {
+                        text += ' ';
+                    } else if (!underscoreBoundary && gap > 1.2) {
+                        text += ' ';
+                    }
+                }
+                text += str;
+                lastY = ty;
+                lastEndX = tx + width;
+            }
+            return text;
         }
 
         async function getTextCoordinatesFromPage(pdfDocument, pageNumber) {
@@ -1257,7 +1439,7 @@
 
                     // Get text coordinates to find TAX INVOICE position
                     let cropY = null;
-                    if (cropTaxInvoice) {
+                    if (cropTaxInvoice && !sortOnlyNoCrop) {
                         const textItems = await getTextCoordinatesFromPage(pdfjsDoc, pageNumber);
                         const pageObj = await pdfjsDoc.getPage(pageNumber);
                         const pageHeight = pageObj.view[3];
@@ -1306,6 +1488,7 @@
                         size: skuInfo.size,
                         color: skuInfo.color,
                         skuCode: skuInfo.skuCode,
+                        accountName: accountName,
                         cropY: cropY
                     });
                 }
@@ -1358,6 +1541,286 @@
             return quantity >= 2 ? 2 : 1; // 1 for qty < 2, 2 for qty >= 2
         }
 
+        function dataUrlToUint8Array(dataUrl) {
+            const base64 = String(dataUrl || '').split(',')[1] || '';
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        async function getBuyerPanelFonts(pdfDoc) {
+            if (!pdfDoc._buyerPanelFonts) {
+                pdfDoc._buyerPanelFonts = {
+                    regular: await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica),
+                    bold: await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold),
+                };
+            }
+            return pdfDoc._buyerPanelFonts;
+        }
+
+        async function getBrandingImages(pdfDoc) {
+            if (pdfDoc._brandingImages) {
+                return pdfDoc._brandingImages;
+            }
+            const assets = window.BRANDING_ASSETS || {};
+            const images = { thankYou: null, packedCare: null };
+            try {
+                if (assets.thankYou) {
+                    images.thankYou = await pdfDoc.embedJpg(dataUrlToUint8Array(assets.thankYou));
+                }
+            } catch (e) {
+                console.warn('Failed to embed thank-you banner:', e);
+            }
+            try {
+                if (assets.packedCare) {
+                    images.packedCare = await pdfDoc.embedJpg(dataUrlToUint8Array(assets.packedCare));
+                }
+            } catch (e) {
+                console.warn('Failed to embed packed-care stamp:', e);
+            }
+            pdfDoc._brandingImages = images;
+            return images;
+        }
+
+        /**
+         * Graphic branding in empty label space:
+         * thank-you on the left, packed-with-care on the right (no seller name clutter).
+         */
+        async function drawBuyerExperiencePanel(page, pdfDoc, { fonts, freeBottomHeight = null } = {}) {
+            if (!fonts?.regular || !fonts?.bold) {
+                return false;
+            }
+
+            const { width, height } = page.getSize();
+            const sideMargin = 22;
+            const bottomMargin = 16;
+            const topClearance = 40;
+            const mutedInk = PDFLib.rgb(0.4, 0.35, 0.45);
+
+            const emptyTop = freeBottomHeight != null ? freeBottomHeight : height * 0.42;
+            const maxBlockTop = emptyTop - topClearance;
+            const desiredHeight = 120;
+            const blockTop = Math.min(bottomMargin + desiredHeight, maxBlockTop);
+            const blockHeight = blockTop - bottomMargin;
+
+            if (blockHeight < 85 || maxBlockTop <= bottomMargin + 80) {
+                return false;
+            }
+
+            const images = await getBrandingImages(pdfDoc);
+            const contentWidth = width - sideMargin * 2;
+            const gap = 14;
+            const colWidth = (contentWidth - gap) / 2;
+            const artHeight = Math.max(50, blockHeight - 22);
+
+            // Soft backdrop
+            page.drawRectangle({
+                x: sideMargin - 2,
+                y: bottomMargin - 2,
+                width: contentWidth + 4,
+                height: blockHeight + 4,
+                borderColor: PDFLib.rgb(0.88, 0.86, 0.9),
+                borderWidth: 0.7,
+                color: PDFLib.rgb(1, 1, 1),
+            });
+
+            // Left: thank-you graphic
+            if (images.thankYou) {
+                const dims = images.thankYou.scale(1);
+                const scale = Math.min(colWidth / dims.width, artHeight / dims.height);
+                const w = dims.width * scale;
+                const h = dims.height * scale;
+                page.drawImage(images.thankYou, {
+                    x: sideMargin + (colWidth - w) / 2,
+                    y: bottomMargin + 16 + (artHeight - h) / 2,
+                    width: w,
+                    height: h,
+                });
+            } else {
+                const font = fonts.bold;
+                const text = 'Thank you for your order';
+                const size = 10;
+                const tw = font.widthOfTextAtSize(text, size);
+                page.drawText(text, {
+                    x: sideMargin + (colWidth - tw) / 2,
+                    y: bottomMargin + 16 + artHeight / 2,
+                    size,
+                    font,
+                    color: PDFLib.rgb(0.3, 0.15, 0.45),
+                });
+            }
+
+            // Right: packed-with-care graphic
+            if (images.packedCare) {
+                const dims = images.packedCare.scale(1);
+                const scale = Math.min(colWidth / dims.width, artHeight / dims.height);
+                const w = dims.width * scale;
+                const h = dims.height * scale;
+                page.drawImage(images.packedCare, {
+                    x: sideMargin + colWidth + gap + (colWidth - w) / 2,
+                    y: bottomMargin + 16 + (artHeight - h) / 2,
+                    width: w,
+                    height: h,
+                });
+            } else {
+                const font = fonts.bold;
+                const text = 'PACKED WITH CARE';
+                const size = 9;
+                const tw = font.widthOfTextAtSize(text, size);
+                page.drawText(text, {
+                    x: sideMargin + colWidth + gap + (colWidth - tw) / 2,
+                    y: bottomMargin + 16 + artHeight / 2,
+                    size,
+                    font,
+                    color: PDFLib.rgb(0.2, 0.2, 0.22),
+                });
+            }
+
+            // Soft rating line centered under both graphics
+            const rating = 'If you loved it, a Meesho rating means a lot to us.';
+            const ratingSize = 7.5;
+            const ratingW = fonts.regular.widthOfTextAtSize(rating, ratingSize);
+            page.drawText(rating, {
+                x: Math.max(sideMargin, (width - ratingW) / 2),
+                y: bottomMargin + 4,
+                size: ratingSize,
+                font: fonts.regular,
+                color: mutedInk,
+            });
+
+            return true;
+        }
+
+        async function appendSortedLabelPage(newPdfDoc, pageInfo) {
+            const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
+            if (!originalPage) {
+                return;
+            }
+
+            const fonts = addBuyerTipsOnLabel ? await getBuyerPanelFonts(newPdfDoc) : null;
+
+            // Sort-only mode: keep full original page size, then draw buyer panel in empty bottom
+            if (sortOnlyNoCrop) {
+                const [copiedPage] = await newPdfDoc.copyPages(pdfDocumentData.pdfLibDoc, [pageInfo.pageIndex]);
+                newPdfDoc.addPage(copiedPage);
+                if (addBuyerTipsOnLabel) {
+                    await drawBuyerExperiencePanel(copiedPage, newPdfDoc, { fonts });
+                }
+                return;
+            }
+
+            const embeddedPage = await newPdfDoc.embedPage(originalPage);
+            let embeddedWidth = Number(embeddedPage.width);
+            let embeddedHeight = Number(embeddedPage.height);
+
+            if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
+                return;
+            }
+
+            if (cropTaxInvoice && pageInfo.cropY !== null && pageInfo.cropY !== undefined) {
+                embeddedHeight = pageInfo.cropY;
+            }
+
+            const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
+            const pageHeight = croppedPage.getHeight();
+            const yOffset = pageHeight - embeddedHeight;
+
+            croppedPage.drawPage(embeddedPage, {
+                x: 0,
+                y: yOffset,
+                width: embeddedWidth,
+                height: embeddedHeight,
+            });
+
+            // Draw branding only when leftover bottom space can fit graphics + clearance
+            if (addBuyerTipsOnLabel && yOffset >= 120) {
+                await drawBuyerExperiencePanel(croppedPage, newPdfDoc, {
+                    fonts,
+                    freeBottomHeight: yOffset,
+                });
+            }
+        }
+
+        let pdfPreviewDoc = null;
+
+        async function renderSortedPdfPreview() {
+            const pagesHost = document.getElementById('pdf-preview-pages');
+            const empty = document.getElementById('pdf-preview-empty');
+            const label = document.getElementById('pdf-preview-page-label');
+            if (!pagesHost) return;
+
+            pagesHost.innerHTML = '';
+
+            if (!sortedPdfBytes) {
+                if (empty) empty.classList.remove('hidden');
+                if (label) label.textContent = 'No PDF';
+                return;
+            }
+
+            try {
+                if (empty) empty.classList.add('hidden');
+                if (label) label.textContent = 'Loading preview...';
+
+                const data = sortedPdfBytes instanceof Uint8Array
+                    ? sortedPdfBytes.slice(0)
+                    : new Uint8Array(sortedPdfBytes);
+
+                pdfPreviewDoc = await pdfjsLib.getDocument({ data }).promise;
+                const scrollHost = document.getElementById('pdf-preview-scroll');
+                const containerWidth = (scrollHost?.clientWidth || 320) - 16;
+                // Render sharper on Retina / HiDPI displays (fixes blurry preview)
+                const pixelRatio = Math.min(window.devicePixelRatio || 1, 2.5);
+
+                for (let pageNum = 1; pageNum <= pdfPreviewDoc.numPages; pageNum++) {
+                    const page = await pdfPreviewDoc.getPage(pageNum);
+                    const unscaled = page.getViewport({ scale: 1 });
+                    const cssScale = Math.max(Math.min(containerWidth / unscaled.width, 1.25), 0.45);
+                    const viewport = page.getViewport({ scale: cssScale * pixelRatio });
+                    const cssWidth = Math.floor(unscaled.width * cssScale);
+                    const cssHeight = Math.floor(unscaled.height * cssScale);
+
+                    const wrap = document.createElement('div');
+                    wrap.className = 'bg-white rounded border border-slate-200 shadow-sm overflow-hidden';
+
+                    const pageTag = document.createElement('div');
+                    pageTag.className = 'text-[10px] text-slate-500 px-2 py-1 bg-slate-50 border-b border-slate-100';
+                    pageTag.textContent = `Page ${pageNum}`;
+                    wrap.appendChild(pageTag);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.className = 'block mx-auto';
+                    // HiDPI backing store + CSS display size keeps preview sharp on Retina screens
+                    canvas.width = Math.floor(viewport.width);
+                    canvas.height = Math.floor(viewport.height);
+                    canvas.style.width = `${cssWidth}px`;
+                    canvas.style.height = `${cssHeight}px`;
+                    canvas.style.maxWidth = '100%';
+                    wrap.appendChild(canvas);
+                    pagesHost.appendChild(wrap);
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                }
+
+                if (label) {
+                    label.textContent = `${pdfPreviewDoc.numPages} page${pdfPreviewDoc.numPages === 1 ? '' : 's'} — scroll to view`;
+                }
+            } catch (error) {
+                console.error('PDF preview failed:', error);
+                pagesHost.innerHTML = '';
+                if (empty) {
+                    empty.textContent = 'Preview unavailable. You can still download the PDF.';
+                    empty.classList.remove('hidden');
+                }
+                if (label) label.textContent = 'Preview error';
+            }
+        }
+
         async function finalizePdfWithSorting(pageData, pagesRemoved, originalNumPages, sortMode = 'sku') {
             try {
                 updateStatus('Sorting and creating PDF...');
@@ -1399,40 +1862,13 @@
                 const newPdfDoc = await PDFLib.PDFDocument.create();
 
                 for (const pageInfo of sortedPageData) {
-                    const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
-
-                    if (!originalPage) {
-                        continue;
-                    }
-
-                    const embeddedPage = await newPdfDoc.embedPage(originalPage);
-                    let embeddedWidth = Number(embeddedPage.width);
-                    let embeddedHeight = Number(embeddedPage.height);
-
-                    if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
-                        continue;
-                    }
-
-                    // Crop TAX INVOICE section if enabled and crop position found
-                    if (cropTaxInvoice && pageInfo.cropY !== null && pageInfo.cropY !== undefined) {
-                        embeddedHeight = pageInfo.cropY;
-                    }
-
-                    const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
-                    const yOffset = croppedPage.getHeight() - embeddedHeight;
-
-                    croppedPage.drawPage(embeddedPage, {
-                        x: 0,
-                        y: yOffset,
-                        width: embeddedWidth,
-                        height: embeddedHeight,
-                    });
+                    await appendSortedLabelPage(newPdfDoc, pageInfo);
                 }
 
                 updateStatus('Finalizing document...');
                 sortedPdfBytes = await newPdfDoc.save();
 
-                const summary = `Original Pages: ${originalNumPages} | Pages Kept: ${sortedPageData.length} | Pages Removed: ${pagesRemoved}`;
+                const summary = `Original Pages: ${originalNumPages} | Pages Kept: ${sortedPageData.length} | Pages Removed: ${pagesRemoved}${sortOnlyNoCrop ? ' | Sort only (no crop)' : ''}`;
                 let modeLabel = 'Shipping Provider';
                 if (sortMode !== 'provider') {
                     const extras = [];
@@ -1441,7 +1877,10 @@
                     if (sortByCourier) extras.push('Courier');
                     modeLabel = extras.length ? `SKU + ${extras.join(' + ')}` : 'SKU';
                 }
-                showResult(`${modeLabel} Sorting and Cropping Complete!`, summary);
+                if (sortOnlyNoCrop) {
+                    modeLabel += ' (Sort Only)';
+                }
+                showResult(`${modeLabel} Sorting${sortOnlyNoCrop ? '' : ' and Cropping'} Complete!`, summary);
                 renderAccountCounts(); // Render account breakdown
                 renderProviderCounts(); // Render provider breakdown
                 renderSkuCounts();
@@ -1838,6 +2277,7 @@
                                 skuCode: page.skuCode || data.skuCode || '',
                                 size: page.size || data.size || '',
                                 color: page.color || data.color || '',
+                                accountName: page.accountName || '',
                                 shippingProvider: page.shippingProvider,
                                 quantity: page.quantity,
                                 rawTextLength: 0,
@@ -1874,6 +2314,7 @@
                             skuCode: page.skuCode || data.skuCode || '',
                             size: page.size || data.size || '',
                             color: page.color || data.color || '',
+                            accountName: page.accountName || '',
                             shippingProvider: page.shippingProvider,
                             quantity: page.quantity,
                             rawTextLength: 0,
@@ -1921,34 +2362,7 @@
                 const newPdfDoc = await PDFLib.PDFDocument.create();
 
                 for (const pageInfo of pageData) {
-                    const originalPage = pdfDocumentData.pdfLibDoc.getPages()[pageInfo.pageIndex];
-
-                    if (!originalPage) {
-                        continue;
-                    }
-
-                    const embeddedPage = await newPdfDoc.embedPage(originalPage);
-                    let embeddedWidth = Number(embeddedPage.width);
-                    let embeddedHeight = Number(embeddedPage.height);
-
-                    if (isNaN(embeddedWidth) || isNaN(embeddedHeight)) {
-                        continue;
-                    }
-
-                    // Crop TAX INVOICE section if enabled and crop position found
-                    if (cropTaxInvoice && pageInfo.cropY !== null && pageInfo.cropY !== undefined) {
-                        embeddedHeight = pageInfo.cropY;
-                    }
-
-                    const croppedPage = newPdfDoc.addPage([TARGET_WIDTH_POINTS, TARGET_HEIGHT_POINTS]);
-                    const yOffset = croppedPage.getHeight() - embeddedHeight;
-
-                    croppedPage.drawPage(embeddedPage, {
-                        x: 0,
-                        y: yOffset,
-                        width: embeddedWidth,
-                        height: embeddedHeight,
-                    });
+                    await appendSortedLabelPage(newPdfDoc, pageInfo);
                 }
 
                 updateStatus('Finalizing document...');
@@ -1956,9 +2370,9 @@
 
                 const groupedCount = customGroups.reduce((sum, g) => sum + g.skus.length, 0);
                 const ungroupedCount = Object.keys(detectedSkuData).length - groupedCount;
-                const summary = `Custom Groups: ${customGroups.length} | Grouped SKUs: ${groupedCount} | Ungrouped SKUs: ${ungroupedCount} | Total Pages: ${pageData.length}`;
+                const summary = `Custom Groups: ${customGroups.length} | Grouped SKUs: ${groupedCount} | Ungrouped SKUs: ${ungroupedCount} | Total Pages: ${pageData.length}${sortOnlyNoCrop ? ' | Sort only (no crop)' : ''}`;
 
-                showResult('Custom Grouping Applied Successfully!', summary);
+                showResult(sortOnlyNoCrop ? 'Custom Grouping Applied (Sort Only)!' : 'Custom Grouping Applied Successfully!', summary);
                 renderAccountCounts(); // Render account breakdown for custom grouping too
                 renderProviderCounts();
                 renderCustomGroupSummary();
@@ -1971,9 +2385,10 @@
             }
         }
 
-        function appendCollapsibleGroupSummaryCard(container, { title, totalOrders, detailsHtml, cardClass, titleClass, countClass }) {
+        function appendCollapsibleGroupSummaryCard(container, { title, totalOrders, detailsHtml, cardClass, titleClass, countClass, groupKind = 'custom' }) {
             const wrapper = document.createElement('div');
             wrapper.className = cardClass;
+            wrapper.dataset.groupKind = groupKind;
             const detailsId = `group-summary-${Math.random().toString(36).slice(2, 11)}`;
 
             wrapper.innerHTML = `
@@ -2030,7 +2445,7 @@
                     if (data) {
                         const rowBg = groupRowColors[index % groupRowColors.length];
                         return `<div class="flex justify-between items-center ${rowBg} px-3 py-2 rounded mb-2">
-                        <span class="text-sm text-gray-700">${data.rawSku}</span>
+                        <span class="text-sm text-gray-700">${formatSkuDisplayLabel(data)}</span>
                         <span class="font-semibold ${group.color.text}">${data.pages.length}</span>
                     </div>`;
                     }
@@ -2044,6 +2459,7 @@
                     cardClass: `mb-4 ${group.color.bg} ${group.color.border} border-2 rounded-lg`,
                     titleClass: group.color.text,
                     countClass: group.color.text,
+                    groupKind: 'custom',
                 });
             });
 
@@ -2059,7 +2475,7 @@
                     const data = detectedSkuData[skuKey];
                     const rowBg = rowColors[index % rowColors.length];
                     return `<div class="flex justify-between items-center ${rowBg} px-3 py-2 rounded mb-2">
-                        <span class="text-sm text-gray-700">${data.rawSku}</span>
+                        <span class="text-sm text-gray-700">${formatSkuDisplayLabel(data)}</span>
                         <span class="font-semibold text-gray-600">${data.pages.length}</span>
                     </div>`;
                 }).join('');
@@ -2075,6 +2491,7 @@
                     cardClass: 'mb-4 bg-gray-100 border-2 border-gray-300 rounded-lg',
                     titleClass: 'text-gray-700',
                     countClass: 'text-gray-600',
+                    groupKind: 'ungrouped',
                 });
             }
         }
@@ -2258,19 +2675,50 @@
                 ${resultArea.innerHTML}
             `;
 
-            // Remove action buttons from the export clone
+            // Summary PDF is stats-only — drop sorted PDF preview and action buttons
             exportContainer.querySelectorAll(
-                '#download-button, #download-summary-button, #share-summary-button'
+                '#pdf-preview-column, #download-button, #download-summary-button, #share-summary-button'
             ).forEach(el => el.remove());
-
-            // Expand all collapsible groups so the PDF shows full UI content
-            exportContainer.querySelectorAll('.group-summary-details').forEach(el => {
-                el.classList.remove('hidden');
-                el.style.display = 'block';
+            // Keep group totals: they live inside .group-summary-toggle <button>s — convert to divs
+            // instead of deleting all buttons (that was wiping "N orders" from the export).
+            exportContainer.querySelectorAll('button.group-summary-toggle').forEach(btn => {
+                const div = document.createElement('div');
+                div.className = btn.className;
+                div.innerHTML = btn.innerHTML;
+                btn.replaceWith(div);
             });
+            exportContainer.querySelectorAll('button').forEach(el => el.remove());
+            // Left column was 3/5 in a grid; make it full width for the export
+            exportContainer.querySelectorAll('#result-details-column').forEach(el => {
+                el.className = 'min-w-0';
+            });
+            exportContainer.querySelectorAll('.grid').forEach(el => {
+                el.className = el.className
+                    .replace(/\bgrid-cols-\S+/g, '')
+                    .replace(/\blg:grid-cols-\S+/g, '')
+                    .replace(/\bgap-\S+/g, '')
+                    .trim();
+                el.classList.add('block');
+            });
+
+            // Export: custom groups collapsed (header + total only); Ungrouped SKUs expanded
+            const applyGroupExportVisibility = (root) => {
+                root.querySelectorAll('[data-group-kind]').forEach(card => {
+                    const details = card.querySelector('.group-summary-details');
+                    if (!details) return;
+                    const expand = card.dataset.groupKind === 'ungrouped';
+                    if (expand) {
+                        details.classList.remove('hidden');
+                        details.style.display = 'block';
+                    } else {
+                        details.classList.add('hidden');
+                        details.style.display = 'none';
+                    }
+                });
+            };
+            applyGroupExportVisibility(exportContainer);
             exportContainer.querySelectorAll('.group-summary-chevron').forEach(el => el.remove());
             exportContainer.querySelectorAll('.group-summary-toggle').forEach(el => {
-                el.setAttribute('aria-expanded', 'true');
                 el.style.cursor = 'default';
                 el.style.overflow = 'visible';
                 el.style.minHeight = '56px';
@@ -2342,10 +2790,7 @@
                         cloned.style.background = '#f7f7f9';
                         cloned.style.fontFamily = 'Arial, Helvetica, sans-serif';
 
-                        cloned.querySelectorAll('.group-summary-details').forEach(el => {
-                            el.classList.remove('hidden');
-                            el.style.display = 'block';
-                        });
+                        applyGroupExportVisibility(cloned);
 
                         cloned.querySelectorAll('.group-summary-toggle').forEach(el => {
                             el.style.overflow = 'visible';
