@@ -463,6 +463,87 @@
             }
         }
 
+        function skuKeyAlnum(value) {
+            return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        }
+
+        function legacySkuFingerprint(value) {
+            // Old keys stripped digits and often included FREESIZE/NA from descriptiveSku
+            return skuKeyAlnum(value)
+                .replace(/FREESIZE/g, '')
+                .replace(/NA/g, '')
+                .replace(/\d+/g, '');
+        }
+
+        /**
+         * Map a saved group SKU key onto current detectedSkuData keys.
+         * Needed after SKU key algorithm changes (pack counts, skuCode-based keys).
+         */
+        function resolveSavedSkuKey(savedKey) {
+            if (!savedKey) return [];
+            if (detectedSkuData[savedKey]) return [savedKey];
+
+            const savedCore = skuKeyAlnum(String(savedKey).replace(/^SKU_(PRD|HSN)-/i, ''));
+            if (!savedCore) return [];
+            const savedLegacy = legacySkuFingerprint(savedCore);
+            const savedLooksLegacyDescriptive = /FREESIZE|PCS/i.test(savedCore);
+
+            const matches = [];
+            Object.entries(detectedSkuData).forEach(([key, data]) => {
+                const candidates = [
+                    skuKeyAlnum(key.replace(/^SKU_(PRD|HSN)-/i, '')),
+                    skuKeyAlnum(data.skuCode),
+                    skuKeyAlnum(data.rawSku),
+                    skuKeyAlnum(`${data.skuCode || ''} ${data.size || ''} ${data.color || ''}`)
+                ].filter(Boolean);
+
+                if (candidates.includes(savedCore)) {
+                    matches.push(key);
+                    return;
+                }
+
+                // Old digit-stripped descriptive keys → current pack-aware keys
+                if (savedLooksLegacyDescriptive && savedLegacy.length >= 6) {
+                    const hit = candidates.some(c => legacySkuFingerprint(c) === savedLegacy);
+                    if (hit) matches.push(key);
+                }
+            });
+
+            return [...new Set(matches)];
+        }
+
+        function remapSavedGroupSkusToCurrentKeys() {
+            if (!customGroups.length || !Object.keys(detectedSkuData).length) {
+                return false;
+            }
+
+            let changed = false;
+            customGroups.forEach(group => {
+                const next = [];
+                const seen = new Set();
+                (group.skus || []).forEach(savedKey => {
+                    resolveSavedSkuKey(savedKey).forEach(key => {
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            next.push(key);
+                        }
+                    });
+                });
+                const before = (group.skus || []).join('\0');
+                const after = next.join('\0');
+                if (before !== after) {
+                    group.skus = next;
+                    changed = true;
+                }
+            });
+
+            if (changed) {
+                saveGroupsToStorage();
+                console.log('Remapped saved group SKU keys to current PDF keys');
+            }
+            return changed;
+        }
+
         function updateStatus(message, isError = false) {
             document.getElementById('upload-section').classList.add('hidden');
             document.getElementById('status-area').classList.remove('hidden');
@@ -690,12 +771,13 @@
             accountNameCounts = {}; // Reset account counts
             providerNameCounts = {}; // Reset provider counts
             summaryBreakdownMode = 'sku';
-            customGroups = [];
-            groupCounter = 1;
+            // Keep saved groups in localStorage — only refresh in-memory from storage
+            // (clearing here used to make assignments look wiped until reload)
             pdfDocumentData = null;
             processedPageData = [];
             processedPagesRemoved = 0;
             originalPageCount = 0;
+            loadGroupsFromStorage();
             loadSortPreferences();
         }
 
@@ -1506,8 +1588,9 @@
                     processedPagesRemoved = pagesRemoved;
                     originalPageCount = numPages;
 
-                    // Load saved groups before showing UI
+                    // Load saved groups and remap SKU keys if extraction format changed
                     const hasStoredGroups = loadGroupsFromStorage();
+                    const remapped = remapSavedGroupSkusToCurrentKeys();
 
                     // Show sorting options and allow the user to select workflow.
                     document.getElementById('loading-indicator').classList.add('hidden');
@@ -1515,7 +1598,8 @@
 
                     // Show notification if groups were loaded
                     if (hasStoredGroups) {
-                        showNotification(`Loaded ${customGroups.length} saved group(s)`, 'success');
+                        const remapNote = remapped ? ' (relinked SKUs to new IDs)' : '';
+                        showNotification(`Loaded ${customGroups.length} saved group(s)${remapNote}`, 'success');
                     }
                 } else {
                     // Auto-sort without grouping
