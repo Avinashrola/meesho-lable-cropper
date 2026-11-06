@@ -700,9 +700,9 @@
         }
 
         function normalizeSkuForGrouping(sku) {
-            let strippedSku = sku.replace(/\s+\d+$/g, '');
-            strippedSku = strippedSku.replace(/(\s\d+)/g, '');
-            return strippedSku;
+            // Do NOT strip digits — pack counts are part of the SKU identity
+            // (e.g. "hair serum - 2 pcs" vs "hair serum - 3 PCS" must stay separate).
+            return String(sku || '').replace(/\s+/g, ' ').trim();
         }
 
         function getSizeSortOrder(size) {
@@ -1092,14 +1092,16 @@
             }
 
             if (descriptiveSku && descriptiveSku.length > 2) {
-                const groupedSku = normalizeSkuForGrouping(descriptiveSku);
-                const normalizedSku = groupedSku.toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
+                // Key by SKU code (not size/qty/color) so pack variants stay distinct
+                const keySource = normalizeSkuForGrouping(skuCode || descriptiveSku);
+                const normalizedSku = keySource.toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
                 const sortingKey = 'SKU_PRD-' + normalizedSku;
+                const resolvedSkuCode = skuCode || descriptiveSku.split(/\s+/)[0] || '';
 
                 if (!uniqueSkuCounts[sortingKey]) {
                     uniqueSkuCounts[sortingKey] = {
                         rawSku: descriptiveSku,
-                        skuCode: skuCode || descriptiveSku.split(/\s+/)[0] || '',
+                        skuCode: resolvedSkuCode,
                         size: size || '',
                         color: color || '',
                         count: 1
@@ -1111,7 +1113,7 @@
                 return {
                     sortingKey,
                     rawSku: descriptiveSku,
-                    skuCode: skuCode || descriptiveSku.split(/\s+/)[0] || '',
+                    skuCode: resolvedSkuCode,
                     size: size || '',
                     color: color || ''
                 };
